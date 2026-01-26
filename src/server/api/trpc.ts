@@ -1,42 +1,46 @@
 /**
- * YOU PROBABLY DON'T NEED TO EDIT THIS FILE, UNLESS:
- * 1. You want to modify request context (see Part 1).
- * 2. You want to create a new middleware or type of procedure (see Part 3).
- *
- * TL;DR - This is where all the tRPC server stuff is created and plugged in. The pieces you will
- * need to use are documented accordingly near the end.
+ * tRPC Server Configuration
+ * 
+ * This file contains the tRPC server setup including:
+ * - Context creation with database and user session
+ * - Router and procedure definitions
+ * - Authentication middleware
  */
-import { initTRPC } from "@trpc/server";
+import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
 import { db } from "~/server/db";
+import { 
+  getCurrentUser, 
+  hasPermission, 
+  type SystemUser, 
+  type Permission 
+} from "~/server/auth";
 
 /**
- * 1. CONTEXT
- *
- * This section defines the "contexts" that are available in the backend API.
- *
- * These allow you to access things when processing a request, like the database, the session, etc.
- *
- * This helper generates the "internals" for a tRPC context. The API handler and RSC clients each
- * wrap this and provides the required context.
- *
- * @see https://trpc.io/docs/server/context
+ * Context type definition
  */
-export const createTRPCContext = async (opts: { headers: Headers }) => {
+interface CreateContextOptions {
+  headers: Headers;
+}
+
+/**
+ * Create tRPC context for each request
+ * Includes database connection and user session
+ */
+export const createTRPCContext = async (opts: CreateContextOptions) => {
+  const user = await getCurrentUser();
+
   return {
     db,
+    user,
     ...opts,
   };
 };
 
 /**
- * 2. INITIALIZATION
- *
- * This is where the tRPC API is initialized, connecting the context and transformer. We also parse
- * ZodErrors so that you get typesafety on the frontend if your procedure fails due to validation
- * errors on the backend.
+ * tRPC initialization with context type inference
  */
 const t = initTRPC.context<typeof createTRPCContext>().create({
   transformer: superjson,
@@ -53,54 +57,114 @@ const t = initTRPC.context<typeof createTRPCContext>().create({
 });
 
 /**
- * Create a server-side caller.
- *
- * @see https://trpc.io/docs/server/server-side-calls
+ * Server-side caller factory
  */
 export const createCallerFactory = t.createCallerFactory;
 
 /**
- * 3. ROUTER & PROCEDURE (THE IMPORTANT BIT)
- *
- * These are the pieces you use to build your tRPC API. You should import these a lot in the
- * "/src/server/api/routers" directory.
- */
-
-/**
- * This is how you create new routers and sub-routers in your tRPC API.
- *
- * @see https://trpc.io/docs/router
+ * Router creation helper
  */
 export const createTRPCRouter = t.router;
 
 /**
- * Middleware for timing procedure execution and adding an artificial delay in development.
- *
- * You can remove this if you don't like it, but it can help catch unwanted waterfalls by simulating
- * network latency that would occur in production but not in local development.
+ * Middleware: Request timing and artificial delay in development
  */
 const timingMiddleware = t.middleware(async ({ next, path }) => {
   const start = Date.now();
 
   if (t._config.isDev) {
-    // artificial delay in dev
-    const waitMs = Math.floor(Math.random() * 400) + 100;
+    // Artificial delay in dev to simulate network latency
+    const waitMs = Math.floor(Math.random() * 100) + 50;
     await new Promise((resolve) => setTimeout(resolve, waitMs));
   }
 
   const result = await next();
 
   const end = Date.now();
-  console.log(`[TRPC] ${path} took ${end - start}ms to execute`);
+  console.log(`[TRPC] ${path} took ${end - start}ms`);
 
   return result;
 });
 
 /**
- * Public (unauthenticated) procedure
- *
- * This is the base piece you use to build new queries and mutations on your tRPC API. It does not
- * guarantee that a user querying is authorized, but you can still access user session data if they
- * are logged in.
+ * Middleware: Authentication check
+ */
+const authMiddleware = t.middleware(async ({ ctx, next }) => {
+  if (!ctx.user) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Du må være logget inn for å utføre denne handlingen",
+    });
+  }
+
+  return next({
+    ctx: {
+      ...ctx,
+      user: ctx.user, // Now guaranteed to be defined
+    },
+  });
+});
+
+/**
+ * Middleware: Permission check factory
+ */
+const createPermissionMiddleware = (requiredPermission: Permission) =>
+  t.middleware(async ({ ctx, next }) => {
+    if (!ctx.user) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "Du må være logget inn",
+      });
+    }
+
+    if (!hasPermission(ctx.user, requiredPermission)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Du har ikke tilgang til denne ressursen",
+      });
+    }
+
+    return next({
+      ctx: {
+        ...ctx,
+        user: ctx.user,
+      },
+    });
+  });
+
+/**
+ * Public procedure
+ * Can be called without authentication
  */
 export const publicProcedure = t.procedure.use(timingMiddleware);
+
+/**
+ * Protected procedure
+ * Requires user to be logged in
+ */
+export const protectedProcedure = t.procedure
+  .use(timingMiddleware)
+  .use(authMiddleware);
+
+/**
+ * Create a procedure that requires a specific permission
+ */
+export const createPermissionProcedure = (permission: Permission) =>
+  t.procedure
+    .use(timingMiddleware)
+    .use(createPermissionMiddleware(permission));
+
+// Pre-defined permission-based procedures for common use cases
+export const agreementReadProcedure = createPermissionProcedure("agreements:read");
+export const agreementWriteProcedure = createPermissionProcedure("agreements:write");
+export const visitReadProcedure = createPermissionProcedure("visits:read");
+export const visitWriteProcedure = createPermissionProcedure("visits:write");
+export const invoiceReadProcedure = createPermissionProcedure("invoices:read");
+export const invoiceWriteProcedure = createPermissionProcedure("invoices:write");
+export const adminProcedure = createPermissionProcedure("admin:settings");
+
+/**
+ * Type helpers for route handlers
+ */
+export type Context = Awaited<ReturnType<typeof createTRPCContext>>;
+export type ProtectedContext = Context & { user: SystemUser };
