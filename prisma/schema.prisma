@@ -2,20 +2,463 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-    provider = "prisma-client-js"
-    output   = "../generated/prisma"
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
 }
 
 datasource db {
-    provider = "postgresql"
-    url      = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-model Post {
-    id        Int      @id @default(autoincrement())
-    name      String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+// ============================================
+// ENUMS
+// ============================================
 
-    @@index([name])
+enum SystemType {
+  SOLAR
+  BESS
+  HYBRID
+}
+
+enum AgreementType {
+  BASIC
+  STANDARD
+  PREMIUM
+  ENTERPRISE
+}
+
+enum AgreementStatus {
+  DRAFT
+  PENDING_APPROVAL
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+  CANCELLED
+}
+
+enum SlaLevel {
+  STANDARD
+  PRIORITY
+  CRITICAL
+}
+
+enum VisitStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  RESCHEDULED
+}
+
+enum VisitType {
+  ANNUAL_INSPECTION
+  SEMI_ANNUAL
+  QUARTERLY
+  TROUBLESHOOTING
+  EMERGENCY
+  WARRANTY
+}
+
+enum ChecklistStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ChecklistItemStatus {
+  PENDING
+  OK
+  NOT_OK
+  NOT_APPLICABLE
+}
+
+enum FindingSeverity {
+  CRITICAL
+  SERIOUS
+  MODERATE
+  MINOR
+  INFO
+}
+
+enum InvoiceStatus {
+  DRAFT
+  PENDING
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum AddonCategory {
+  MAINTENANCE
+  MONITORING
+  PRIORITY
+  EQUIPMENT
+}
+
+enum AddonFrequency {
+  ONE_TIME
+  PER_VISIT
+  MONTHLY
+  ANNUAL
+}
+
+// ============================================
+// CUSTOMER CACHE (Read-only from Tripletex)
+// ============================================
+
+model CustomerCache {
+  tripletexId   String   @id @map("tripletex_id")
+  name          String
+  orgNumber     String?  @map("org_number")
+  contactPerson String?  @map("contact_person")
+  email         String?
+  phone         String?
+  address       String?
+  postalCode    String?  @map("postal_code")
+  city          String?
+  invoiceEmail  String?  @map("invoice_email")
+  syncedAt      DateTime @default(now()) @map("synced_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  installations Installation[]
+
+  @@map("customer_cache")
+}
+
+// ============================================
+// INSTALLATION
+// ============================================
+
+model Installation {
+  id              String     @id @default(cuid())
+  customerId      String     @map("customer_id")
+  name            String?
+  address         String
+  postalCode      String?    @map("postal_code")
+  city            String?
+  latitude        Decimal?   @db.Decimal(10, 8)
+  longitude       Decimal?   @db.Decimal(11, 8)
+  systemType      SystemType @map("system_type")
+  capacityKw      Decimal    @map("capacity_kw") @db.Decimal(10, 2)
+  installDate     DateTime   @map("install_date")
+  inverterType    String?    @map("inverter_type")
+  inverterCount   Int?       @map("inverter_count")
+  panelType       String?    @map("panel_type")
+  panelCount      Int?       @map("panel_count")
+  batteryType     String?    @map("battery_type")
+  batteryKwh      Decimal?   @map("battery_kwh") @db.Decimal(10, 2)
+  monitoringId    String?    @map("monitoring_id")
+  monitoringType  String?    @map("monitoring_type")
+  notes           String?
+  isActive        Boolean    @default(true) @map("is_active")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  customer   CustomerCache      @relation(fields: [customerId], references: [tripletexId])
+  agreements ServiceAgreement[]
+
+  @@index([customerId])
+  @@index([systemType])
+  @@index([city])
+  @@map("installations")
+}
+
+// ============================================
+// SERVICE AGREEMENT
+// ============================================
+
+model ServiceAgreement {
+  id                 String          @id @default(cuid())
+  installationId     String          @map("installation_id")
+  agreementNumber    String          @unique @map("agreement_number")
+  agreementType      AgreementType   @map("agreement_type")
+  status             AgreementStatus @default(DRAFT)
+  slaLevel           SlaLevel        @default(STANDARD) @map("sla_level")
+  startDate          DateTime        @map("start_date")
+  endDate            DateTime?       @map("end_date")
+  basePrice          Decimal         @map("base_price") @db.Decimal(10, 2)
+  calculatedPrice    Decimal?        @map("calculated_price") @db.Decimal(10, 2)
+  discountPercent    Decimal?        @map("discount_percent") @db.Decimal(5, 2)
+  autoRenew          Boolean         @default(true) @map("auto_renew")
+  visitFrequency     Int             @default(1) @map("visit_frequency") // visits per year
+  preferredVisitDay  String?         @map("preferred_visit_day")
+  preferredTimeSlot  String?         @map("preferred_time_slot")
+  notes              String?
+  signedAt           DateTime?       @map("signed_at")
+  signedBy           String?         @map("signed_by")
+  cancelledAt        DateTime?       @map("cancelled_at")
+  cancellationReason String?         @map("cancellation_reason")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  installation Installation     @relation(fields: [installationId], references: [id])
+  visits       ServiceVisit[]
+  addons       AgreementAddon[]
+  invoices     Invoice[]
+  servicePlan  ServicePlan?
+
+  @@index([installationId])
+  @@index([status])
+  @@index([agreementType])
+  @@index([startDate, endDate])
+  @@map("service_agreements")
+}
+
+// ============================================
+// SERVICE PLAN
+// ============================================
+
+model ServicePlan {
+  id             String   @id @default(cuid())
+  agreementId    String   @unique @map("agreement_id")
+  visitFrequency Int      @map("visit_frequency")
+  nextVisitDate  DateTime @map("next_visit_date")
+  visitWindow    Int      @default(14) @map("visit_window") // days flexibility
+  preferredMonth String?  @map("preferred_month")
+  seasonalAdj    Boolean  @default(true) @map("seasonal_adj")
+  notes          String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  agreement ServiceAgreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+
+  @@map("service_plans")
+}
+
+// ============================================
+// SERVICE VISIT
+// ============================================
+
+model ServiceVisit {
+  id             String      @id @default(cuid())
+  agreementId    String      @map("agreement_id")
+  technicianId   String      @map("technician_id")
+  visitNumber    Int         @map("visit_number")
+  scheduledDate  DateTime    @map("scheduled_date")
+  scheduledEnd   DateTime?   @map("scheduled_end")
+  actualStart    DateTime?   @map("actual_start")
+  actualEnd      DateTime?   @map("actual_end")
+  status         VisitStatus @default(SCHEDULED)
+  visitType      VisitType   @map("visit_type")
+  durationMin    Int?        @map("duration_min")
+  travelTimeMin  Int?        @map("travel_time_min")
+  notes          String?
+  technicianNotes String?    @map("technician_notes")
+  customerSign   String?     @map("customer_sign") // base64 signature
+  customerSignAt DateTime?   @map("customer_sign_at")
+  completedAt    DateTime?   @map("completed_at")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  agreement  ServiceAgreement @relation(fields: [agreementId], references: [id])
+  checklists Checklist[]
+
+  @@index([agreementId])
+  @@index([technicianId])
+  @@index([scheduledDate])
+  @@index([status])
+  @@map("service_visits")
+}
+
+// ============================================
+// CHECKLIST & CHECKLIST ITEMS
+// ============================================
+
+model ChecklistTemplate {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  systemType  SystemType @map("system_type")
+  visitType   VisitType  @map("visit_type")
+  version     Int        @default(1)
+  isActive    Boolean    @default(true) @map("is_active")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  items      ChecklistTemplateItem[]
+  checklists Checklist[]
+
+  @@unique([name, version])
+  @@map("checklist_templates")
+}
+
+model ChecklistTemplateItem {
+  id            String          @id @default(cuid())
+  templateId    String          @map("template_id")
+  category      String
+  sortOrder     Int             @map("sort_order")
+  code          String
+  description   String
+  inputType     String          @map("input_type") // YES_NO, NUMERIC, TEXT, CHOICE, IMAGE, SIGNATURE
+  options       Json?           // for CHOICE type
+  minValue      Decimal?        @map("min_value") @db.Decimal(10, 2)
+  maxValue      Decimal?        @map("max_value") @db.Decimal(10, 2)
+  unit          String?
+  isMandatory   Boolean         @default(true) @map("is_mandatory")
+  photoRequired Boolean         @default(false) @map("photo_required")
+  helpText      String?         @map("help_text")
+  defaultSeverity FindingSeverity? @map("default_severity")
+  createdAt     DateTime        @default(now()) @map("created_at")
+
+  // Relations
+  template ChecklistTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+  @@map("checklist_template_items")
+}
+
+model Checklist {
+  id           String          @id @default(cuid())
+  visitId      String          @map("visit_id")
+  templateId   String          @map("template_id")
+  technicianId String          @map("technician_id")
+  status       ChecklistStatus @default(PENDING)
+  startedAt    DateTime?       @map("started_at")
+  completedAt  DateTime?       @map("completed_at")
+  aiSummary    String?         @map("ai_summary")
+  aiGenerated  DateTime?       @map("ai_generated")
+  notes        String?
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  visit    ServiceVisit      @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  template ChecklistTemplate @relation(fields: [templateId], references: [id])
+  items    ChecklistItem[]
+
+  @@index([visitId])
+  @@index([templateId])
+  @@map("checklists")
+}
+
+model ChecklistItem {
+  id              String              @id @default(cuid())
+  checklistId     String              @map("checklist_id")
+  templateItemId  String?             @map("template_item_id")
+  category        String
+  code            String
+  description     String
+  inputType       String              @map("input_type")
+  status          ChecklistItemStatus @default(PENDING)
+  value           String?
+  numericValue    Decimal?            @map("numeric_value") @db.Decimal(10, 2)
+  notes           String?
+  severity        FindingSeverity?
+  photoUrls       Json?               @map("photo_urls")
+  gpsLatitude     Decimal?            @map("gps_latitude") @db.Decimal(10, 8)
+  gpsLongitude    Decimal?            @map("gps_longitude") @db.Decimal(11, 8)
+  completedAt     DateTime?           @map("completed_at")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  checklist Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+
+  @@index([checklistId])
+  @@map("checklist_items")
+}
+
+// ============================================
+// ADDON PRODUCTS
+// ============================================
+
+model AddonProduct {
+  id              String        @id @default(cuid())
+  name            String
+  description     String?
+  category        AddonCategory
+  frequency       AddonFrequency
+  basePrice       Decimal       @map("base_price") @db.Decimal(10, 2)
+  unit            String?       // e.g., "per m²", "per visit"
+  tripletexProductId String?    @unique @map("tripletex_product_id")
+  isActive        Boolean       @default(true) @map("is_active")
+  sortOrder       Int           @default(0) @map("sort_order")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  agreementAddons AgreementAddon[]
+
+  @@index([category])
+  @@index([isActive])
+  @@map("addon_products")
+}
+
+model AgreementAddon {
+  id          String   @id @default(cuid())
+  agreementId String   @map("agreement_id")
+  addonId     String   @map("addon_id")
+  quantity    Int      @default(1)
+  customPrice Decimal? @map("custom_price") @db.Decimal(10, 2)
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  agreement ServiceAgreement @relation(fields: [agreementId], references: [id], onDelete: Cascade)
+  addon     AddonProduct     @relation(fields: [addonId], references: [id])
+
+  @@unique([agreementId, addonId])
+  @@map("agreement_addons")
+}
+
+// ============================================
+// INVOICE
+// ============================================
+
+model Invoice {
+  id              String        @id @default(cuid())
+  agreementId     String?       @map("agreement_id")
+  tripletexId     String?       @unique @map("tripletex_id")
+  invoiceNumber   String?       @unique @map("invoice_number")
+  customerId      String        @map("customer_id")
+  amount          Decimal       @db.Decimal(10, 2)
+  vatAmount       Decimal       @map("vat_amount") @db.Decimal(10, 2)
+  totalAmount     Decimal       @map("total_amount") @db.Decimal(10, 2)
+  currency        String        @default("NOK")
+  status          InvoiceStatus @default(DRAFT)
+  dueDate         DateTime?     @map("due_date")
+  sentAt          DateTime?     @map("sent_at")
+  paidAt          DateTime?     @map("paid_at")
+  description     String?
+  lineItems       Json?         @map("line_items")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  agreement ServiceAgreement? @relation(fields: [agreementId], references: [id])
+
+  @@index([agreementId])
+  @@index([customerId])
+  @@index([status])
+  @@map("invoices")
+}
+
+// ============================================
+// REPORT
+// ============================================
+
+model ServiceReport {
+  id          String   @id @default(cuid())
+  visitId     String   @unique @map("visit_id")
+  title       String
+  summary     String?
+  content     String   // JSON or Markdown
+  aiGenerated Boolean  @default(false) @map("ai_generated")
+  pdfUrl      String?  @map("pdf_url")
+  sentAt      DateTime? @map("sent_at")
+  sentTo      String?  @map("sent_to")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("service_reports")
 }
