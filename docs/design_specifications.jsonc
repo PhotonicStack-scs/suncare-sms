@@ -1,0 +1,522 @@
+{
+  // ============================================================
+  // Mevolut-inspired Fintech Dashboard → Solar Service Management
+  // UI Handoff Brief (Designer → Developer)
+  // ============================================================
+
+  "meta": {
+    "screenType": "Web app dashboard (admin-style)",
+    "visualStyle": "Modern, dark-first, soft-elevation cards, subtle borders, high-contrast typography, neon-primary highlights",
+    "designGoalsForSolarApp": [
+      "Replace fintech concepts with: service scheduling, plant portfolio status, service agreements, invoicing specs",
+      "Keep the same information density and card+table hierarchy",
+      "Primary action emphasis via bright primary color and restrained secondary accents"
+    ]
+  },
+
+  "layout": {
+    "overallStructure": {
+      "appShell": "Left sidebar + main content area",
+      "mainContent": "Top header + KPI tiles row + mid content (limits+balance chart) + data table"
+    },
+
+    "gridAndSpacing": {
+      "outerPadding": {
+        "default": "24px",
+        "compact": "16px"
+      },
+      "gap": {
+        "cardGap": "16px",
+        "sectionGap": "20px",
+        "rowGap": "12px"
+      },
+      "radius": {
+        "appFrameRadius": "18px",
+        "cardRadius": "14px",
+        "buttonRadius": "10px",
+        "pillRadius": "999px"
+      },
+      "borders": {
+        "default": "1px solid subtle"
+      },
+      "shadows": {
+        "default": "Soft, wide, low-opacity (dark mode) / lighter soft shadow (light mode)",
+        "card": "Subtle lift + inner highlight line"
+      }
+    },
+
+    "responsiveBreakpoints_TailwindDefaults": {
+      "xs": {
+        "note": "Tailwind has no default xs; treat as <640px (mobile).",
+        "behavior": [
+          "Sidebar becomes off-canvas (hamburger in header).",
+          "KPI tiles become vertical stack (1 column).",
+          "Mid section becomes vertical: limits card above chart.",
+          "Table becomes card-list rows (each row = stacked fields)."
+        ]
+      },
+      "sm_640": {
+        "behavior": [
+          "Sidebar off-canvas by default; can be pinned open optionally.",
+          "KPI tiles: 1 column or 2 columns depending on content length.",
+          "Table stays scrollable horizontally if needed."
+        ]
+      },
+      "md_768": {
+        "behavior": [
+          "Sidebar can be permanently visible (narrow width).",
+          "KPI tiles: 2–3 columns.",
+          "Mid section: two columns (limits on left, chart on right).",
+          "Table: full grid table layout."
+        ]
+      },
+      "lg_1024": {
+        "behavior": [
+          "Matches screenshot density: full sidebar, 3 KPI tiles row.",
+          "Mid section comfortably 2 columns with chart wide.",
+          "Table shows all columns without truncation in most cases."
+        ]
+      },
+      "xl_1280": {
+        "behavior": [
+          "Increase max-width and breathing room; keep card widths consistent.",
+          "Allow chart to expand; table rows keep consistent height."
+        ]
+      },
+      "2xl_1536": {
+        "behavior": [
+          "Center content with max-width; preserve sidebar width.",
+          "Maintain readable line lengths; avoid overly stretched KPI cards."
+        ]
+      }
+    }
+  },
+
+  "colorSystem": {
+    "constraints": {
+      "primary": "#FBD11E",
+      "secondaryFamily": "Tailwind-like neutrals + slate/blue family for non-primary emphasis",
+      "note": "Use only primary + secondary family for most UI; additional grays and a few accents allowed for gradients/status."
+    },
+
+    "palette": {
+      "primary": {
+        "base": "#FBD11E",
+        "hover": "#F9C90A",
+        "active": "#EAB308", // similar to Tailwind yellow-500/600 region
+        "textOnPrimary": "#0B0F14"
+      },
+
+      "secondary": {
+        "info": {
+          "base": "#60A5FA", // Tailwind blue-400
+          "muted": "#3B82F6" // blue-500
+        },
+        "success": {
+          "base": "#22C55E", // green-500
+          "muted": "#16A34A"
+        },
+        "danger": {
+          "base": "#EF4444", // red-500
+          "muted": "#DC2626"
+        },
+        "warning": {
+          "base": "#F59E0B", // amber-500
+          "muted": "#D97706"
+        }
+      },
+
+      "grays_darkMode": {
+        "bgApp": "#0B0F14",
+        "bgSidebar": "#0E141B",
+        "bgCard": "#111827",
+        "bgCardAlt": "#0F172A",
+        "surfaceHover": "#162033",
+        "borderSubtle": "rgba(255,255,255,0.07)",
+        "borderStrong": "rgba(255,255,255,0.12)",
+        "textPrimary": "rgba(255,255,255,0.92)",
+        "textSecondary": "rgba(255,255,255,0.70)",
+        "textTertiary": "rgba(255,255,255,0.52)",
+        "iconMuted": "rgba(255,255,255,0.55)"
+      },
+
+      "grays_lightMode": {
+        "bgApp": "#F7F8FB",
+        "bgSidebar": "#FFFFFF",
+        "bgCard": "#FFFFFF",
+        "bgCardAlt": "#F3F4F6",
+        "surfaceHover": "#EEF2F7",
+        "borderSubtle": "rgba(15,23,42,0.10)",
+        "borderStrong": "rgba(15,23,42,0.18)",
+        "textPrimary": "rgba(15,23,42,0.92)",
+        "textSecondary": "rgba(15,23,42,0.68)",
+        "textTertiary": "rgba(15,23,42,0.50)",
+        "iconMuted": "rgba(15,23,42,0.50)"
+      },
+
+      "complexMediaAccents": {
+        "cardGradientAccent": {
+          "example": "Primary glow band or radial tint behind a hero card area",
+          "darkMode": "radial-gradient(circle at 30% 20%, rgba(251,209,30,0.28), rgba(0,0,0,0) 55%)",
+          "lightMode": "radial-gradient(circle at 30% 20%, rgba(251,209,30,0.18), rgba(255,255,255,0) 60%)"
+        },
+        "chartHighlight": {
+          "activeBar": "#FBD11E",
+          "inactiveBars": "rgba(255,255,255,0.10) (dark) / rgba(15,23,42,0.10) (light)",
+          "gridLines": "rgba(255,255,255,0.06) (dark) / rgba(15,23,42,0.08) (light)"
+        }
+      }
+    }
+  },
+
+  "typography": {
+    "fontStyle": "System sans or modern geometric sans feel (clean, compact metrics)",
+    "scale": {
+      "pageTitle": { "size": "16–18px", "weight": 600, "tracking": "normal" },
+      "kpiValue": { "size": "20–24px", "weight": 700 },
+      "kpiLabel": { "size": "12–13px", "weight": 500, "color": "textSecondary" },
+      "sectionTitle": { "size": "13–14px", "weight": 600 },
+      "body": { "size": "13–14px", "weight": 500 },
+      "tableHeader": { "size": "12px", "weight": 600, "color": "textTertiary" },
+      "tableCell": { "size": "13px", "weight": 500 }
+    },
+    "numberFormatting": {
+      "kpi": "Currency / unit formatting with consistent separators",
+      "solarAppMapping": "Use kW, kWh, SLA hours, invoice amounts with the same typographic emphasis"
+    }
+  },
+
+  "components": {
+    "appFrame": {
+      "background": "Very dark/neutral (dark mode) with faint dotted texture in the outermost shell",
+      "innerWindow": "Centered rounded container with soft shadow and subtle border",
+      "note": "Texture is optional; keep it extremely subtle so content remains primary"
+    },
+
+    "sidebar": {
+      "width": {
+        "collapsed": "72–84px (icons only)",
+        "expanded": "260–288px"
+      },
+      "structure": [
+        "Brand row at top: logo mark + app name",
+        "Search input under brand",
+        "Nav sections with small section labels (MENU / FEATURES / TOOLS)",
+        "Nav items with icon + label; active item has filled/outlined highlight bar",
+        "Upgrade/CTA card pinned near bottom"
+      ],
+      "navItemStates": {
+        "default": "Muted icon + text",
+        "hover": "Background tint + brighter text",
+        "active": "Stronger background tint + left accent indicator + bolder text"
+      },
+      "solarAppNavMapping": {
+        "menu": [
+          "Dashboard",
+          "Service Schedule",
+          "Work Orders",
+          "Plants",
+          "Agreements",
+          "Invoices",
+          "History"
+        ],
+        "features": ["Integrations", "Automation"],
+        "tools": ["Settings", "Help Center"]
+      },
+      "upgradeCard": {
+        "placement": "Bottom-left inside sidebar",
+        "content": "Title + short description + primary button",
+        "style": "Card with soft border, subtle glow, primary button"
+      }
+    },
+
+    "topHeader": {
+      "left": {
+        "title": "Dashboard",
+        "optionalBreadcrumb": "If needed for solar app: Plants / {Plant Name} / Dashboard"
+      },
+      "right": {
+        "icons": ["clock/history-like icon", "bell/notifications", "user/avatar"],
+        "search": "Global search input aligned to the right in main content area"
+      },
+      "actionsRow": {
+        "primarySecondaryButtons": [
+          {
+            "label": "Generate Report",
+            "style": "Secondary button with icon, subtle border"
+          },
+          {
+            "label": "Export",
+            "style": "Secondary button with icon, subtle border"
+          }
+        ],
+        "solarAppMapping": [
+          "Generate Report → Create Service Summary",
+          "Export → Export Invoice Spec / Export Work Orders"
+        ]
+      }
+    },
+
+    "kpiTilesRow": {
+      "layout": "Three equal cards in a row (lg+); stack on smaller screens",
+      "cards": [
+        {
+          "title": "Total Revenue this month",
+          "value": "$21,219.24",
+          "subtext": "Vs last month",
+          "subtextIcon": "Small clock/compare icon"
+        },
+        {
+          "title": "Total Saving",
+          "value": "$14,376.26",
+          "subtext": "Vs last month"
+        },
+        {
+          "title": "Taxes to be paid",
+          "value": "$4,667.02",
+          "subtext": "Vs last month"
+        }
+      ],
+      "solarAppMappingExamples": [
+        "Scheduled Visits This Month",
+        "Active Service Agreements",
+        "Invoices Pending Approval"
+      ],
+      "visual": {
+        "cardBackground": "Dark card surface with subtle border",
+        "spacing": "Title above value; subtext below value in smaller type"
+      }
+    },
+
+    "midSection": {
+      "layout": "Two columns: left card (limits + payment card), right card (available balance + chart)",
+      "leftCard_SpendingLimits": {
+        "header": {
+          "title": "AI-Generated Spending Limits",
+          "value": "$4,815.23"
+        },
+        "subsection": {
+          "title": "Smart Spending Limits",
+          "legendStyle": "Small colored squares + labels + percentages",
+          "progressBars": [
+            { "label": "Shopping", "value": "27%", "color": "primaryTint" },
+            { "label": "Dining Out", "value": "18%", "color": "secondaryTint1" },
+            { "label": "Subscriptions", "value": "35%", "color": "secondaryTint2" },
+            { "label": "Other", "value": "20%", "color": "neutralTint" }
+          ]
+        },
+        "embeddedCardVisual": {
+          "type": "Payment card mock (VISA-style)",
+          "style": "Glossy gradient with primary glow; large masked numbers; name + expiry",
+          "solarAppReplacement": "Replace with 'Service Agreement' card preview (Agreement ID, SLA tier, renewal date) using same glossy treatment"
+        }
+      },
+
+      "rightCard_AvailableBalanceChart": {
+        "header": {
+          "title": "Available Balance",
+          "value": "$102,175.96",
+          "segmentedControl": ["Line view", "Bar view"],
+          "actions": [
+            { "label": "Request", "style": "Secondary button" },
+            { "label": "Transfer", "style": "Primary button" },
+            { "label": "More", "style": "Icon button (kebab/menu)" }
+          ]
+        },
+        "chart": {
+          "type": "Bar chart (monthly)",
+          "xAxisLabels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep"],
+          "yAxisLabels": "Compact repeated tick labels shown as currency abbreviations (e.g., $543k style), with dotted horizontal gridlines",
+          "highlight": "One active month bar in primary (bright yellow); others muted gray",
+          "footerCompare": "Small 'Vs last month' note at bottom-left"
+        },
+        "solarAppReplacement": [
+          "Chart title → 'Plant Availability' or 'Work Orders Completed'",
+          "Actions → 'New Work Order' (primary), 'Request Parts' (secondary), 'More'",
+          "Segments → 'Bar view' / 'Line view' for trends"
+        ]
+      }
+    },
+
+    "dataTableSection": {
+      "container": "Full-width card with table inside",
+      "toolbar": {
+        "left": [
+          "Search input (placeholder: Search Transaction...)",
+          "Filter chips/buttons: Processed Date, Processed Date (second filter), More dropdown"
+        ],
+        "right": [
+          "Import button (secondary)",
+          "Export button (secondary)"
+        ]
+      },
+      "table": {
+        "style": "Sticky-ish header feel; rows separated by subtle dividers; first column checkboxes",
+        "columns_FintechExample": [
+          "Payment ID",
+          "Total Amount",
+          "To",
+          "Payment Period",
+          "Payment Method",
+          "Processed Date",
+          "Status"
+        ],
+        "rowContentPatterns": {
+          "id": "Monospace-ish or spaced code-like text",
+          "to": "Name with small circular avatar",
+          "method": "Pill chip (e.g., Wire Transfer / Bank Transfer)",
+          "status": "Colored pill (green received, red failed, blue processed)"
+        },
+        "pagination": {
+          "left": "Chevron controls + page numbers",
+          "right": "Row count summary + 'Show All' button"
+        }
+      },
+      "solarAppTableMapping": {
+        "columns": [
+          "Work Order ID",
+          "Site / Plant",
+          "Service Type",
+          "Scheduled Window",
+          "Assigned Crew",
+          "Completed Date",
+          "Status"
+        ],
+        "statusPills": [
+          { "label": "Scheduled", "color": "info" },
+          { "label": "In Progress", "color": "warning" },
+          { "label": "Completed", "color": "success" },
+          { "label": "Blocked", "color": "danger" }
+        ],
+        "rowAsCardsOnMobile": [
+          "Top row: Work Order ID + Status pill",
+          "Middle: Site + Service type",
+          "Bottom: Scheduled window + crew + quick actions"
+        ]
+      }
+    },
+
+    "inputsAndButtons": {
+      "searchInput": {
+        "shape": "Rounded rectangle",
+        "leadingIcon": "Magnifier",
+        "background": "Slightly lighter than page background",
+        "border": "Subtle border; stronger on focus",
+        "placeholder": "Muted"
+      },
+      "buttons": {
+        "primary": {
+          "bg": "primary",
+          "text": "dark text on primary",
+          "hover": "slightly darker primary",
+          "icon": "optional left icon",
+          "height": "36–40px"
+        },
+        "secondary": {
+          "bg": "transparent or faint surface",
+          "border": "subtle",
+          "text": "textPrimary",
+          "hover": "surfaceHover"
+        },
+        "iconButton": {
+          "shape": "rounded",
+          "size": "36px",
+          "hover": "surfaceHover"
+        }
+      },
+      "chipsAndPills": {
+        "filterChip": "Compact rounded chip with icon; toggles active state",
+        "statusPill": "Rounded pill with colored dot or colored outline+fill"
+      },
+      "segmentedControl": {
+        "container": "Rounded capsule",
+        "tabActive": "filled surface + brighter text",
+        "tabInactive": "transparent + muted text"
+      }
+    }
+  },
+
+  "lightAndDarkMode": {
+    "darkMode": {
+      "dominant": "Deep charcoal backgrounds with subtle borders and soft glow highlights",
+      "cardSurface": "Slightly lighter than app background; border visible; inner highlight line",
+      "primaryUsage": [
+        "Primary CTA buttons",
+        "Chart active bar",
+        "Small progress bars and key indicators",
+        "Occasional gradient glow on featured card (agreement/preview)"
+      ],
+      "statusColors": "Use saturated but controlled pills; avoid neon beyond primary"
+    },
+    "lightMode": {
+      "dominant": "Off-white background with white cards and faint gray borders",
+      "cardSurface": "White with light shadow; hover adds soft gray tint",
+      "primaryUsage": [
+        "Primary CTA buttons",
+        "Chart active bar (still primary)",
+        "Highlights and progress bars"
+      ],
+      "contrastRule": "Keep text and icons in slate/ink tones; avoid pure black where possible"
+    },
+    "modeSwitchingRules": [
+      "All semantic colors remain consistent (success/danger/info).",
+      "Only neutrals (backgrounds, borders, text opacity) invert by mode.",
+      "Primary stays identical (#FBD11E) in both modes."
+    ]
+  },
+
+  "interactionAndStates": {
+    "hover": [
+      "Cards: slight elevation + border becomes a touch stronger",
+      "Nav items: background tint appears",
+      "Table rows: subtle row highlight across full width"
+    ],
+    "focus": [
+      "Inputs: border/outline increases contrast; optional primary-tinted ring",
+      "Buttons: visible focus ring distinct from hover"
+    ],
+    "activeSelected": [
+      "Sidebar active item: persistent highlight + bolder label",
+      "Segmented control: active tab filled"
+    ],
+    "loadingEmpty": [
+      "KPI cards: skeleton lines for title/value",
+      "Chart: skeleton bars or shimmer grid",
+      "Table: skeleton rows; empty state with icon + short guidance"
+    ],
+    "density": {
+      "default": "Comfortable spacing like screenshot",
+      "compactOption": "Reduce row height and card padding for power users"
+    }
+  },
+
+  "contentGuidelines_SolarApp": {
+    "dashboardKPIs": [
+      "Upcoming services (7 days)",
+      "Overdue work orders",
+      "Active agreements",
+      "Invoice amount pending",
+      "Crew utilization"
+    ],
+    "midCards": [
+      "Smart scheduling recommendations (replacing spending limits concept)",
+      "Plant performance / availability trend (replacing balance chart concept)",
+      "Agreement preview card (replacing payment card mock)"
+    ],
+    "tablePrimaryUse": "Work orders and service history with status pills and filters"
+  },
+
+  "accessibility": {
+    "contrast": [
+      "Ensure textSecondary remains readable on card backgrounds in both modes",
+      "Primary button text uses dark ink for strong contrast on yellow"
+    ],
+    "hitTargets": [
+      "Icon buttons minimum ~36px square",
+      "Row checkbox and status pills easy to tap on touch"
+    ],
+    "keyboard": [
+      "Sidebar nav, segmented control, table row actions fully reachable"
+    ]
+  }
+}
