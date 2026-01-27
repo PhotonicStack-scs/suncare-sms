@@ -1,5 +1,6 @@
-import { ClipboardList } from "lucide-react";
-import { Card, CardContent } from "~/components/ui/card";
+import { Suspense } from "react";
+import { VisitList } from "~/components/features/visits";
+import { SkeletonTable } from "~/components/ui/skeleton";
 
 export const metadata = {
   title: "Arbeidsordre | Suncare",
@@ -16,16 +17,9 @@ export default function VisitsPage() {
         </p>
       </div>
 
-      <Card>
-        <CardContent className="flex flex-col items-center justify-center py-16">
-          <ClipboardList className="size-16 text-muted-foreground mb-4" />
-          <h2 className="text-lg font-semibold mb-2">Kommer snart</h2>
-          <p className="text-muted-foreground text-center max-w-md">
-            Her vil du kunne administrere arbeidsordre, se detaljer om
-            servicebesøk, og følge opp pågående arbeid.
-          </p>
-        </CardContent>
-      </Card>
+      <Suspense fallback={<SkeletonTable rows={5} columns={7} />}>
+        <VisitList />
+      </Suspense>
     </div>
   );
 }
