@@ -1,493 +1,482 @@
-/**
- * Predefined checklist templates for service management
- * These should be seeded to the database
- */
+import type { InputType } from "~/types/checklists";
 
-import type { FindingSeverity } from "~/types/checklists";
+/**
+ * Checklist Template Data for MVP
+ * These templates can be seeded into the database
+ */
 
 export interface ChecklistTemplateData {
   name: string;
   description: string;
-  systemType: "SOLAR" | "BESS" | "HYBRID";
-  visitType: string;
+  systemType: "SOLAR_PANEL" | "BESS" | "COMBINED";
+  visitType: "ANNUAL_INSPECTION" | "SEMI_ANNUAL" | "QUARTERLY" | "EMERGENCY" | "REPAIR" | "INSTALLATION";
   items: Array<{
     category: string;
-    sortOrder: number;
-    code: string;
     description: string;
-    inputType: string;
-    options?: string[];
-    minValue?: number;
-    maxValue?: number;
-    unit?: string;
+    inputType: InputType;
     isMandatory: boolean;
     photoRequired: boolean;
+    minValue?: number;
+    maxValue?: number;
+    options?: string[];
     helpText?: string;
-    defaultSeverity?: FindingSeverity;
+    sortOrder: number;
   }>;
 }
 
-export const solarAnnualInspectionTemplate: ChecklistTemplateData = {
-  name: "Årlig solcelleinspeksjon",
-  description: "Komplett sjekkliste for årlig inspeksjon av solcelleinstallasjoner",
-  systemType: "SOLAR",
+export const ANNUAL_SOLAR_INSPECTION: ChecklistTemplateData = {
+  name: "Årlig inspeksjon - Solceller",
+  description: "Komplett årlig serviceinspeksjon for solcelleanlegg",
+  systemType: "SOLAR_PANEL",
   visitType: "ANNUAL_INSPECTION",
   items: [
     // Category 1: Safety and Access
     {
       category: "Sikkerhet og tilgang",
-      sortOrder: 1,
-      code: "1.1",
       description: "HMS-vurdering gjennomført før start",
       inputType: "YES_NO",
       isMandatory: true,
       photoRequired: false,
-      helpText: "Kontroller at nødvendig sikkerhetsutstyr er tilgjengelig",
+      helpText: "Bekreft at HMS-sjekk er utført",
+      sortOrder: 1,
     },
     {
       category: "Sikkerhet og tilgang",
+      description: "Tilgang til anlegg verifisert",
+      inputType: "YES_NO",
+      isMandatory: true,
+      photoRequired: false,
       sortOrder: 2,
-      code: "1.2",
-      description: "Tilgang til installasjon verifisert",
-      inputType: "YES_NO",
-      isMandatory: true,
-      photoRequired: false,
     },
     {
       category: "Sikkerhet og tilgang",
+      description: "Nødstopp identifisert og testet",
+      inputType: "YES_NO",
+      isMandatory: true,
+      photoRequired: false,
       sortOrder: 3,
-      code: "1.3",
-      description: "Nødavstengning identifisert og testet",
-      inputType: "YES_NO",
-      isMandatory: true,
-      photoRequired: false,
-      defaultSeverity: "CRITICAL",
     },
     {
       category: "Sikkerhet og tilgang",
-      sortOrder: 4,
-      code: "1.4",
-      description: "Foto av HMS-skilt/merking",
+      description: "Foto av HMS-tavle/merking",
       inputType: "IMAGE",
       isMandatory: true,
       photoRequired: true,
+      sortOrder: 4,
     },
 
     // Category 2: Solar Panels
     {
       category: "Solcellepaneler",
-      sortOrder: 5,
-      code: "2.1",
-      description: "Visuell inspeksjon - fysisk skade",
-      inputType: "YES_NO",
+      description: "Visuell inspeksjon - fysiske skader",
+      inputType: "YES_NO_NA",
       isMandatory: true,
       photoRequired: true,
-      helpText: "Sjekk for sprekker, deformasjon eller synlige skader",
-      defaultSeverity: "SERIOUS",
+      helpText: "Sjekk for sprekker, deformasjoner eller skader",
+      sortOrder: 5,
     },
     {
       category: "Solcellepaneler",
-      sortOrder: 6,
-      code: "2.2",
-      description: "Smuss/rusk på paneler",
-      inputType: "CHOICE",
-      options: ["1 - Rent", "2 - Lett smuss", "3 - Moderat", "4 - Mye smuss", "5 - Kraftig tilsmusset"],
+      description: "Smuss/avfall på paneler",
+      inputType: "NUMERIC",
       isMandatory: true,
       photoRequired: false,
-      defaultSeverity: "MINOR",
+      minValue: 1,
+      maxValue: 5,
+      helpText: "1 = rent, 5 = mye smuss",
+      sortOrder: 6,
     },
     {
       category: "Solcellepaneler",
-      sortOrder: 7,
-      code: "2.3",
       description: "Rengjøring utført",
       inputType: "YES_NO",
       isMandatory: false,
       photoRequired: false,
+      sortOrder: 7,
     },
     {
       category: "Solcellepaneler",
-      sortOrder: 8,
-      code: "2.4",
-      description: "Hotspot-skanning",
-      inputType: "IMAGE",
+      description: "Hotspot-skanning utført",
+      inputType: "YES_NO_NA",
       isMandatory: false,
       photoRequired: true,
-      helpText: "Bruk IR-kamera for å identifisere hotspots",
-      defaultSeverity: "SERIOUS",
+      helpText: "Bruk varmekamera hvis tilgjengelig",
+      sortOrder: 8,
     },
     {
       category: "Solcellepaneler",
-      sortOrder: 9,
-      code: "2.5",
-      description: "Antall mikro-sprekker identifisert",
+      description: "Antall mikrosprekker identifisert",
       inputType: "NUMERIC",
-      minValue: 0,
-      maxValue: 100,
       isMandatory: false,
       photoRequired: false,
-      defaultSeverity: "MODERATE",
+      minValue: 0,
+      sortOrder: 9,
     },
     {
       category: "Solcellepaneler",
-      sortOrder: 10,
-      code: "2.6",
       description: "Festepunkter kontrollert",
       inputType: "YES_NO",
       isMandatory: true,
       photoRequired: false,
-      defaultSeverity: "SERIOUS",
+      sortOrder: 10,
     },
 
     // Category 3: Inverters
     {
       category: "Invertere",
-      sortOrder: 11,
-      code: "3.1",
       description: "Inverter status OK",
       inputType: "YES_NO",
       isMandatory: true,
       photoRequired: false,
-      defaultSeverity: "CRITICAL",
+      sortOrder: 11,
     },
     {
       category: "Invertere",
-      sortOrder: 12,
-      code: "3.2",
       description: "Feilkoder registrert",
       inputType: "TEXT",
       isMandatory: false,
       photoRequired: false,
-      helpText: "Noter eventuelle feilkoder fra displayet",
+      helpText: "Skriv inn eventuelle feilkoder",
+      sortOrder: 12,
     },
     {
       category: "Invertere",
-      sortOrder: 13,
-      code: "3.3",
       description: "Firmware-versjon",
       inputType: "TEXT",
       isMandatory: true,
       photoRequired: false,
+      sortOrder: 13,
     },
     {
       category: "Invertere",
-      sortOrder: 14,
-      code: "3.4",
       description: "Ventilasjonsåpninger rene",
       inputType: "YES_NO",
       isMandatory: true,
       photoRequired: false,
-      defaultSeverity: "MODERATE",
+      sortOrder: 14,
     },
     {
       category: "Invertere",
+      description: "AC-spenning målt (V)",
+      inputType: "ELECTRICAL_MEASUREMENT",
+      isMandatory: true,
+      photoRequired: false,
+      minValue: 200,
+      maxValue: 260,
       sortOrder: 15,
-      code: "3.5",
-      description: "AC/DC spenning målt",
-      inputType: "NUMERIC",
-      unit: "V",
-      isMandatory: true,
-      photoRequired: false,
     },
     {
       category: "Invertere",
-      sortOrder: 16,
-      code: "3.6",
-      description: "Produksjonsavlesning",
-      inputType: "NUMERIC",
-      unit: "kWh",
+      description: "DC-spenning målt (V)",
+      inputType: "ELECTRICAL_MEASUREMENT",
       isMandatory: true,
       photoRequired: false,
+      minValue: 200,
+      maxValue: 600,
+      sortOrder: 16,
+    },
+    {
+      category: "Invertere",
+      description: "Produksjonsavlesning (kWh)",
+      inputType: "NUMERIC",
+      isMandatory: true,
+      photoRequired: true,
+      sortOrder: 17,
     },
 
     // Category 4: Cables and Connections
     {
-      category: "Kabler og tilkoblinger",
-      sortOrder: 17,
-      code: "4.1",
+      category: "Kabler og koblinger",
       description: "Visuell inspeksjon av kabler",
       inputType: "YES_NO",
       isMandatory: true,
       photoRequired: true,
-      defaultSeverity: "SERIOUS",
-    },
-    {
-      category: "Kabler og tilkoblinger",
       sortOrder: 18,
-      code: "4.2",
-      description: "MC4 kontakter kontrollert",
+    },
+    {
+      category: "Kabler og koblinger",
+      description: "MC4-koblinger kontrollert",
       inputType: "YES_NO",
       isMandatory: true,
       photoRequired: false,
-      defaultSeverity: "MODERATE",
-    },
-    {
-      category: "Kabler og tilkoblinger",
       sortOrder: 19,
-      code: "4.3",
-      description: "Jordfeiltest utført",
-      inputType: "YES_NO",
-      isMandatory: true,
-      photoRequired: false,
-      defaultSeverity: "CRITICAL",
     },
     {
-      category: "Kabler og tilkoblinger",
+      category: "Kabler og koblinger",
+      description: "Jordfeiltest utført",
+      inputType: "YES_NO_NA",
+      isMandatory: true,
+      photoRequired: false,
       sortOrder: 20,
-      code: "4.4",
+    },
+    {
+      category: "Kabler og koblinger",
       description: "Kabelgjennomføringer tettet",
       inputType: "YES_NO",
       isMandatory: true,
       photoRequired: false,
-      defaultSeverity: "MODERATE",
+      sortOrder: 21,
     },
 
     // Category 5: Mounting and Structure
     {
-      category: "Montering og struktur",
-      sortOrder: 21,
-      code: "5.1",
+      category: "Montering og konstruksjon",
       description: "Takklemmer/monteringssystem OK",
       inputType: "YES_NO",
       isMandatory: true,
       photoRequired: false,
-      defaultSeverity: "SERIOUS",
+      sortOrder: 22,
     },
     {
-      category: "Montering og struktur",
-      sortOrder: 22,
-      code: "5.2",
+      category: "Montering og konstruksjon",
       description: "Korrosjon observert",
-      inputType: "YES_NO",
+      inputType: "YES_NO_NA",
       isMandatory: false,
       photoRequired: true,
-      defaultSeverity: "MODERATE",
+      sortOrder: 23,
     },
     {
-      category: "Montering og struktur",
-      sortOrder: 23,
-      code: "5.3",
-      description: "Taktetning OK",
+      category: "Montering og konstruksjon",
+      description: "Taktetting OK",
       inputType: "YES_NO",
       isMandatory: true,
       photoRequired: false,
-      defaultSeverity: "SERIOUS",
+      sortOrder: 24,
     },
 
     // Category 6: Performance and Documentation
     {
       category: "Ytelse og dokumentasjon",
-      sortOrder: 24,
-      code: "6.1",
-      description: "Sammenligning med forventet produksjon",
+      description: "Sammenligning med forventet produksjon (%)",
       inputType: "NUMERIC",
-      unit: "%",
-      minValue: 0,
-      maxValue: 150,
       isMandatory: true,
       photoRequired: false,
-      helpText: "100% = forventet produksjon",
+      helpText: "Faktisk produksjon i forhold til forventet",
+      sortOrder: 25,
     },
     {
       category: "Ytelse og dokumentasjon",
-      sortOrder: 25,
-      code: "6.2",
       description: "Avvik notert",
       inputType: "TEXT",
       isMandatory: false,
       photoRequired: false,
+      sortOrder: 26,
     },
     {
       category: "Ytelse og dokumentasjon",
-      sortOrder: 26,
-      code: "6.3",
       description: "Anbefalinger",
       inputType: "TEXT",
       isMandatory: false,
       photoRequired: false,
+      sortOrder: 27,
     },
     {
       category: "Ytelse og dokumentasjon",
-      sortOrder: 27,
-      code: "6.4",
       description: "Kundesignatur",
       inputType: "SIGNATURE",
       isMandatory: true,
       photoRequired: false,
+      sortOrder: 28,
     },
     {
       category: "Ytelse og dokumentasjon",
-      sortOrder: 28,
-      code: "6.5",
       description: "Generelle kommentarer",
       inputType: "TEXT",
       isMandatory: false,
       photoRequired: false,
+      sortOrder: 29,
     },
   ],
 };
 
-export const bessInspectionTemplate: ChecklistTemplateData = {
-  name: "BESS-inspeksjon",
-  description: "Sjekkliste for inspeksjon av batterilagringssystemer",
+export const BESS_INSPECTION: ChecklistTemplateData = {
+  name: "Batteriinspeksjon - BESS",
+  description: "Inspeksjon av batterilagringssystem",
   systemType: "BESS",
   visitType: "ANNUAL_INSPECTION",
   items: [
+    // Safety
     {
       category: "Sikkerhet",
-      sortOrder: 1,
-      code: "B1.1",
       description: "HMS-vurdering gjennomført",
       inputType: "YES_NO",
       isMandatory: true,
       photoRequired: false,
+      sortOrder: 1,
     },
     {
       category: "Sikkerhet",
+      description: "Nødstopp fungerer",
+      inputType: "YES_NO",
+      isMandatory: true,
+      photoRequired: false,
       sortOrder: 2,
-      code: "B1.2",
-      description: "Brannvernutstyr tilgjengelig",
-      inputType: "YES_NO",
-      isMandatory: true,
-      photoRequired: false,
-      defaultSeverity: "CRITICAL",
     },
     {
       category: "Sikkerhet",
+      description: "Brannslukker tilgjengelig",
+      inputType: "YES_NO",
+      isMandatory: true,
+      photoRequired: false,
       sortOrder: 3,
-      code: "B1.3",
-      description: "Nødavstengning testet",
-      inputType: "YES_NO",
+    },
+
+    // Battery Status
+    {
+      category: "Batteristatus",
+      description: "Batterikapasitet målt (%)",
+      inputType: "NUMERIC",
       isMandatory: true,
       photoRequired: false,
-      defaultSeverity: "CRITICAL",
-    },
-    {
-      category: "Batteri",
+      minValue: 0,
+      maxValue: 100,
       sortOrder: 4,
-      code: "B2.1",
-      description: "Batteristatus OK",
+    },
+    {
+      category: "Batteristatus",
+      description: "Antall ladekretser",
+      inputType: "NUMERIC",
+      isMandatory: true,
+      photoRequired: false,
+      sortOrder: 5,
+    },
+    {
+      category: "Batteristatus",
+      description: "Cellbalansering OK",
       inputType: "YES_NO",
       isMandatory: true,
       photoRequired: false,
-      defaultSeverity: "CRITICAL",
-    },
-    {
-      category: "Batteri",
-      sortOrder: 5,
-      code: "B2.2",
-      description: "State of Health (SoH)",
-      inputType: "NUMERIC",
-      unit: "%",
-      minValue: 0,
-      maxValue: 100,
-      isMandatory: true,
-      photoRequired: false,
-    },
-    {
-      category: "Batteri",
       sortOrder: 6,
-      code: "B2.3",
-      description: "State of Charge (SoC)",
-      inputType: "NUMERIC",
-      unit: "%",
+    },
+    {
+      category: "Batteristatus",
+      description: "Temperaturavlesning (°C)",
+      inputType: "TEMPERATURE",
+      isMandatory: true,
+      photoRequired: false,
       minValue: 0,
-      maxValue: 100,
-      isMandatory: true,
-      photoRequired: false,
-    },
-    {
-      category: "Batteri",
+      maxValue: 60,
       sortOrder: 7,
-      code: "B2.4",
-      description: "Temperatur i batterirom",
-      inputType: "NUMERIC",
-      unit: "°C",
-      minValue: -10,
-      maxValue: 50,
-      isMandatory: true,
-      photoRequired: false,
-      defaultSeverity: "SERIOUS",
     },
+
+    // Visual Inspection
     {
-      category: "Batteri",
-      sortOrder: 8,
-      code: "B2.5",
-      description: "Visuell inspeksjon - ingen hevelse",
+      category: "Visuell inspeksjon",
+      description: "Batteriskap i god stand",
       inputType: "YES_NO",
       isMandatory: true,
       photoRequired: true,
-      defaultSeverity: "CRITICAL",
+      sortOrder: 8,
     },
     {
-      category: "System",
+      category: "Visuell inspeksjon",
+      description: "Ingen tegn på lekkasje",
+      inputType: "YES_NO",
+      isMandatory: true,
+      photoRequired: false,
       sortOrder: 9,
-      code: "B3.1",
-      description: "BMS status OK",
+    },
+    {
+      category: "Visuell inspeksjon",
+      description: "Ventilasjon fungerer",
       inputType: "YES_NO",
       isMandatory: true,
       photoRequired: false,
-      defaultSeverity: "CRITICAL",
-    },
-    {
-      category: "System",
       sortOrder: 10,
-      code: "B3.2",
-      description: "Feillogger gjennomgått",
-      inputType: "YES_NO",
-      isMandatory: true,
-      photoRequired: false,
     },
+
+    // Documentation
     {
-      category: "System",
-      sortOrder: 11,
-      code: "B3.3",
+      category: "Dokumentasjon",
       description: "Firmware-versjon",
       inputType: "TEXT",
       isMandatory: true,
       photoRequired: false,
-    },
-    {
-      category: "System",
-      sortOrder: 12,
-      code: "B3.4",
-      description: "Ventilasjon og kjøling OK",
-      inputType: "YES_NO",
-      isMandatory: true,
-      photoRequired: false,
-      defaultSeverity: "SERIOUS",
+      sortOrder: 11,
     },
     {
       category: "Dokumentasjon",
-      sortOrder: 13,
-      code: "B4.1",
-      description: "Kapasitetstest utført",
-      inputType: "YES_NO",
-      isMandatory: false,
-      photoRequired: false,
-    },
-    {
-      category: "Dokumentasjon",
-      sortOrder: 14,
-      code: "B4.2",
       description: "Anbefalinger",
       inputType: "TEXT",
       isMandatory: false,
       photoRequired: false,
+      sortOrder: 12,
     },
     {
       category: "Dokumentasjon",
-      sortOrder: 15,
-      code: "B4.3",
       description: "Kundesignatur",
       inputType: "SIGNATURE",
       isMandatory: true,
       photoRequired: false,
+      sortOrder: 13,
     },
   ],
 };
 
-export const allTemplates = [
-  solarAnnualInspectionTemplate,
-  bessInspectionTemplate,
+// Export all templates
+export const CHECKLIST_TEMPLATES = [
+  ANNUAL_SOLAR_INSPECTION,
+  BESS_INSPECTION,
 ];
+
+// Seed function for database
+export async function seedChecklistTemplates(db: {
+  checklistTemplate: {
+    upsert: (args: {
+      where: { name_version: { name: string; version: number } };
+      create: {
+        name: string;
+        description: string | null;
+        systemType: string;
+        visitType: string;
+        version: number;
+        items: { create: Array<{
+          category: string;
+          description: string;
+          inputType: string;
+          isMandatory: boolean;
+          photoRequired: boolean;
+          minValue?: number;
+          maxValue?: number;
+          options?: string;
+          helpText?: string;
+          sortOrder: number;
+        }> };
+      };
+      update: Record<string, never>;
+    }) => Promise<unknown>;
+  };
+}) {
+  for (const template of CHECKLIST_TEMPLATES) {
+    await db.checklistTemplate.upsert({
+      where: {
+        name_version: {
+          name: template.name,
+          version: 1,
+        },
+      },
+      create: {
+        name: template.name,
+        description: template.description,
+        systemType: template.systemType,
+        visitType: template.visitType,
+        version: 1,
+        items: {
+          create: template.items.map((item) => ({
+            category: item.category,
+            description: item.description,
+            inputType: item.inputType,
+            isMandatory: item.isMandatory,
+            photoRequired: item.photoRequired,
+            minValue: item.minValue,
+            maxValue: item.maxValue,
+            options: item.options ? JSON.stringify(item.options) : undefined,
+            helpText: item.helpText,
+            sortOrder: item.sortOrder,
+          })),
+        },
+      },
+      update: {},
+    });
+  }
+}

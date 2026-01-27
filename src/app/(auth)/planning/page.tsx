@@ -11,7 +11,7 @@ export const metadata = {
 };
 
 async function PlanningStats() {
-  const stats = await api.visit.getStats();
+  const stats = await api.visits.getStats();
 
   return (
     <div className="grid gap-4 md:grid-cols-4">
@@ -73,7 +73,7 @@ async function PlanningStats() {
 }
 
 async function TodayVisits() {
-  const visits = await api.visit.getToday();
+  const visits = await api.visits.getToday();
 
   if (visits.length === 0) {
     return (

@@ -1,54 +1,52 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { auth } from "~/server/auth-config";
 
-// Routes that don't require authentication
-const PUBLIC_ROUTES = [
-  "/",
-  "/login",
-  "/api/auth",
-  "/api/trpc",
+// Routes that require authentication
+const protectedRoutes = [
+  "/dashboard",
+  "/agreements",
+  "/planning",
+  "/visits",
+  "/installations",
+  "/invoices",
+  "/reports",
+  "/history",
+  "/settings",
+  "/automation",
+  "/integrations",
+  "/help",
 ];
 
-// Routes that are always accessible (static files, etc.)
-const STATIC_ROUTES = [
-  "/_next",
-  "/favicon.ico",
-  "/manifest.json",
-  "/sw.js",
-];
+// Routes that should redirect to dashboard if authenticated
+const authRoutes = ["/login", "/"];
 
-export function middleware(request: NextRequest) {
+export default auth((request) => {
   const { pathname } = request.nextUrl;
-
-  // Allow static files
-  if (STATIC_ROUTES.some((route) => pathname.startsWith(route))) {
-    return NextResponse.next();
-  }
-
-  // Allow public routes
-  if (PUBLIC_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`))) {
-    return NextResponse.next();
-  }
-
-  // For protected routes, check for session cookie
-  // Note: This is a basic check. The actual session validation happens in tRPC
-  const sessionCookie = request.cookies.get("next-auth.session-token") 
-    ?? request.cookies.get("__Secure-next-auth.session-token");
-
-  // In development, allow access without session for easier testing
-  if (process.env.NODE_ENV === "development") {
-    return NextResponse.next();
-  }
-
-  // If no session cookie, redirect to login
-  if (!sessionCookie) {
+  const isAuthenticated = !!request.auth;
+  
+  // Check if route is protected
+  const isProtectedRoute = protectedRoutes.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
+  
+  // Check if route is an auth route
+  const isAuthRoute = authRoutes.includes(pathname);
+  
+  // Redirect to login if accessing protected route while not authenticated
+  if (isProtectedRoute && !isAuthenticated) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
   }
-
+  
+  // Redirect to dashboard if accessing auth routes while authenticated
+  if (isAuthRoute && isAuthenticated) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+  
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: [
@@ -57,8 +55,9 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - public files (public directory)
+     * - public files (public folder)
+     * - api routes (handled by NextAuth)
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|public|api).*)",
   ],
 };

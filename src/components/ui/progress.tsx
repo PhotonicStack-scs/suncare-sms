@@ -1,17 +1,19 @@
 "use client";
 
 import * as React from "react";
-import { cn } from "~/lib/utils";
+import * as ProgressPrimitive from "@radix-ui/react-progress";
 import { cva, type VariantProps } from "class-variance-authority";
 
+import { cn } from "~/lib/utils";
+
 const progressVariants = cva(
-  "relative w-full overflow-hidden rounded-full bg-muted",
+  "relative w-full overflow-hidden rounded-full bg-primary/20",
   {
     variants: {
       size: {
         sm: "h-1.5",
-        default: "h-2",
-        lg: "h-3",
+        default: "h-2.5",
+        lg: "h-4",
       },
     },
     defaultVariants: {
@@ -20,16 +22,16 @@ const progressVariants = cva(
   }
 );
 
-const progressIndicatorVariants = cva(
-  "h-full transition-all duration-300 ease-in-out",
+const indicatorVariants = cva(
+  "h-full transition-all duration-300",
   {
     variants: {
       variant: {
         default: "bg-primary",
         success: "bg-success",
         warning: "bg-warning",
-        danger: "bg-destructive",
         info: "bg-info",
+        destructive: "bg-destructive",
       },
     },
     defaultVariants: {
@@ -39,115 +41,90 @@ const progressIndicatorVariants = cva(
 );
 
 interface ProgressProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root>,
     VariantProps<typeof progressVariants>,
-    VariantProps<typeof progressIndicatorVariants> {
-  value?: number;
-  max?: number;
+    VariantProps<typeof indicatorVariants> {}
+
+const Progress = React.forwardRef<
+  React.ComponentRef<typeof ProgressPrimitive.Root>,
+  ProgressProps
+>(({ className, value, size, variant, ...props }, ref) => (
+  <ProgressPrimitive.Root
+    ref={ref}
+    className={cn(progressVariants({ size }), className)}
+    {...props}
+  >
+    <ProgressPrimitive.Indicator
+      className={cn(indicatorVariants({ variant }), "rounded-full")}
+      style={{ width: `${value ?? 0}%` }}
+    />
+  </ProgressPrimitive.Root>
+));
+Progress.displayName = ProgressPrimitive.Root.displayName;
+
+// Labeled progress bar
+interface LabeledProgressProps extends ProgressProps {
+  label: string;
   showValue?: boolean;
+  valueFormatter?: (value: number) => string;
 }
 
-function Progress({
-  className,
+function LabeledProgress({
+  label,
   value = 0,
-  max = 100,
-  size,
-  variant,
-  showValue,
+  showValue = true,
+  valueFormatter = (v) => `${v}%`,
+  className,
   ...props
-}: ProgressProps) {
-  const percentage = Math.min(Math.max((value / max) * 100, 0), 100);
-
+}: LabeledProgressProps) {
   return (
-    <div className={cn("flex items-center gap-2", className)}>
-      <div
-        className={cn(progressVariants({ size }))}
-        role="progressbar"
-        aria-valuenow={value}
-        aria-valuemin={0}
-        aria-valuemax={max}
-        {...props}
-      >
-        <div
-          className={cn(
-            progressIndicatorVariants({ variant }),
-            "rounded-full"
-          )}
-          style={{ width: `${percentage}%` }}
-        />
+    <div className={cn("space-y-1.5", className)}>
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted-foreground">{label}</span>
+        {showValue && (
+          <span className="font-medium">{valueFormatter(value)}</span>
+        )}
       </div>
-      {showValue && (
-        <span className="text-xs font-medium text-muted-foreground tabular-nums">
-          {Math.round(percentage)}%
-        </span>
-      )}
+      <Progress value={value} {...props} />
     </div>
   );
 }
 
+// Segmented progress (multiple sections with different colors)
 interface ProgressSegment {
   value: number;
   color: string;
   label?: string;
 }
 
-interface SegmentedProgressProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof progressVariants> {
+interface SegmentedProgressProps {
   segments: ProgressSegment[];
-  showLegend?: boolean;
+  size?: "sm" | "default" | "lg";
+  className?: string;
 }
 
-function SegmentedProgress({
-  className,
-  segments,
-  size,
-  showLegend,
-  ...props
-}: SegmentedProgressProps) {
-  const total = segments.reduce((sum, seg) => sum + seg.value, 0);
+function SegmentedProgress({ segments, size = "default", className }: SegmentedProgressProps) {
+  const total = segments.reduce((acc, segment) => acc + segment.value, 0);
 
   return (
-    <div className={cn("space-y-2", className)}>
-      <div
-        className={cn(progressVariants({ size }), "flex overflow-hidden")}
-        role="progressbar"
-        {...props}
-      >
-        {segments.map((segment, index) => {
-          const percentage = (segment.value / total) * 100;
-          return (
-            <div
-              key={index}
-              className="h-full transition-all duration-300"
-              style={{
-                width: `${percentage}%`,
-                backgroundColor: segment.color,
-              }}
-            />
-          );
-        })}
-      </div>
-      {showLegend && (
-        <div className="flex flex-wrap gap-4">
-          {segments.map((segment, index) => (
-            <div key={index} className="flex items-center gap-2">
-              <span
-                className="size-2.5 rounded-sm"
-                style={{ backgroundColor: segment.color }}
-              />
-              <span className="text-xs text-muted-foreground">
-                {segment.label ?? `Segment ${index + 1}`}
-              </span>
-              <span className="text-xs font-medium tabular-nums">
-                {Math.round((segment.value / total) * 100)}%
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+    <div className={cn(progressVariants({ size }), "flex", className)}>
+      {segments.map((segment, index) => (
+        <div
+          key={index}
+          className={cn(
+            "h-full transition-all duration-300",
+            index === 0 && "rounded-l-full",
+            index === segments.length - 1 && "rounded-r-full"
+          )}
+          style={{
+            width: `${(segment.value / total) * 100}%`,
+            backgroundColor: segment.color,
+          }}
+          title={segment.label ? `${segment.label}: ${segment.value}%` : undefined}
+        />
+      ))}
     </div>
   );
 }
 
-export { Progress, SegmentedProgress, progressVariants, progressIndicatorVariants };
+export { Progress, LabeledProgress, SegmentedProgress, progressVariants };

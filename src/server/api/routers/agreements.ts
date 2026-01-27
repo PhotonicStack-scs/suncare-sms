@@ -1,160 +1,276 @@
 import { z } from "zod";
-import { TRPCError } from "@trpc/server";
-import {
-  createTRPCRouter,
-  agreementReadProcedure,
-  agreementWriteProcedure,
+import { 
+  createTRPCRouter, 
+  protectedProcedure,
+  agreementsReadProcedure,
+  agreementsWriteProcedure 
 } from "~/server/api/trpc";
 
-// Input schemas
-const createAgreementSchema = z.object({
-  installationId: z.string(),
-  agreementType: z.enum(["BASIC", "STANDARD", "PREMIUM", "ENTERPRISE"]),
-  slaLevel: z.enum(["STANDARD", "PRIORITY", "CRITICAL"]).default("STANDARD"),
-  startDate: z.date(),
-  endDate: z.date().optional(),
-  basePrice: z.number().positive(),
-  discountPercent: z.number().min(0).max(100).optional(),
-  autoRenew: z.boolean().default(true),
-  visitFrequency: z.number().min(1).max(12).default(1),
-  preferredVisitDay: z.string().optional(),
-  preferredTimeSlot: z.string().optional(),
-  notes: z.string().optional(),
-  addons: z
-    .array(
-      z.object({
-        addonId: z.string(),
-        quantity: z.number().min(1).default(1),
-        customPrice: z.number().optional(),
-        notes: z.string().optional(),
-      })
-    )
-    .optional(),
-});
+// Generate unique agreement number
+function generateAgreementNumber(): string {
+  const year = new Date().getFullYear();
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `SA-${year}-${random}`;
+}
 
-const updateAgreementSchema = createAgreementSchema.partial().extend({
-  id: z.string(),
-});
+// Base prices for agreement types (NOK)
+const BASE_PRICES: Record<string, number> = {
+  BASIC: 2500,
+  STANDARD: 4500,
+  PREMIUM: 8500,
+  ENTERPRISE: 15000,
+};
 
-const filterSchema = z.object({
-  status: z
-    .enum(["DRAFT", "PENDING_APPROVAL", "ACTIVE", "SUSPENDED", "EXPIRED", "CANCELLED"])
-    .or(z.array(z.enum(["DRAFT", "PENDING_APPROVAL", "ACTIVE", "SUSPENDED", "EXPIRED", "CANCELLED"])))
-    .optional(),
-  agreementType: z
-    .enum(["BASIC", "STANDARD", "PREMIUM", "ENTERPRISE"])
-    .or(z.array(z.enum(["BASIC", "STANDARD", "PREMIUM", "ENTERPRISE"])))
-    .optional(),
-  customerId: z.string().optional(),
-  installationId: z.string().optional(),
-  slaLevel: z.enum(["STANDARD", "PRIORITY", "CRITICAL"]).optional(),
-  startDateFrom: z.date().optional(),
-  startDateTo: z.date().optional(),
-  expiringWithinDays: z.number().optional(),
-  search: z.string().optional(),
-  limit: z.number().min(1).max(100).default(50),
-  offset: z.number().min(0).default(0),
-});
+// SLA multipliers
+const SLA_MULTIPLIERS: Record<string, number> = {
+  STANDARD: 1.0,
+  PRIORITY: 1.25,
+  CRITICAL: 1.5,
+};
 
-export const agreementRouter = createTRPCRouter({
+export const agreementsRouter = createTRPCRouter({
   /**
    * Get all agreements with filters
    */
-  getAll: agreementReadProcedure
-    .input(filterSchema.optional())
+  getAll: agreementsReadProcedure
+    .input(
+      z.object({
+        status: z.enum(["DRAFT", "ACTIVE", "EXPIRED", "CANCELLED", "PENDING_RENEWAL"]).optional(),
+        agreementType: z.enum(["BASIC", "STANDARD", "PREMIUM", "ENTERPRISE"]).optional(),
+        customerId: z.string().optional(),
+        installationId: z.string().optional(),
+        search: z.string().optional(),
+        page: z.number().min(0).default(0),
+        limit: z.number().min(1).max(100).default(20),
+      })
+    )
     .query(async ({ ctx, input }) => {
-      const where: Record<string, unknown> = {};
+      const { status, agreementType, customerId, installationId, search, page, limit } = input;
 
-      if (input?.status) {
-        where.status = Array.isArray(input.status)
-          ? { in: input.status }
-          : input.status;
-      }
-
-      if (input?.agreementType) {
-        where.agreementType = Array.isArray(input.agreementType)
-          ? { in: input.agreementType }
-          : input.agreementType;
-      }
-
-      if (input?.customerId) {
-        where.installation = { customerId: input.customerId };
-      }
-
-      if (input?.installationId) {
-        where.installationId = input.installationId;
-      }
-
-      if (input?.slaLevel) {
-        where.slaLevel = input.slaLevel;
-      }
-
-      if (input?.startDateFrom || input?.startDateTo) {
-        where.startDate = {
-          ...(input.startDateFrom && { gte: input.startDateFrom }),
-          ...(input.startDateTo && { lte: input.startDateTo }),
-        };
-      }
-
-      if (input?.expiringWithinDays) {
-        const expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + input.expiringWithinDays);
-        where.endDate = {
-          gte: new Date(),
-          lte: expiryDate,
-        };
-        where.status = "ACTIVE";
-      }
-
-      if (input?.search) {
-        where.OR = [
-          { agreementNumber: { contains: input.search, mode: "insensitive" } },
-          { installation: { customer: { name: { contains: input.search, mode: "insensitive" } } } },
-          { installation: { address: { contains: input.search, mode: "insensitive" } } },
-        ];
-      }
+      const where = {
+        ...(status && { status }),
+        ...(agreementType && { agreementType }),
+        ...(installationId && { installationId }),
+        ...(customerId && {
+          installation: {
+            customerId,
+          },
+        }),
+        ...(search && {
+          OR: [
+            { agreementNumber: { contains: search, mode: "insensitive" as const } },
+            {
+              installation: {
+                customer: {
+                  name: { contains: search, mode: "insensitive" as const },
+                },
+              },
+            },
+          ],
+        }),
+      };
 
       const [agreements, total] = await Promise.all([
         ctx.db.serviceAgreement.findMany({
           where,
-          take: input?.limit ?? 50,
-          skip: input?.offset ?? 0,
+          skip: page * limit,
+          take: limit,
           orderBy: { createdAt: "desc" },
           include: {
             installation: {
               include: {
-                customer: {
-                  select: {
-                    tripletexId: true,
-                    name: true,
-                    email: true,
-                    phone: true,
-                  },
-                },
+                customer: true,
               },
             },
             addons: {
-              include: { addon: true },
+              include: {
+                addon: true,
+              },
             },
             _count: {
-              select: { visits: true, invoices: true },
+              select: { visits: true },
             },
           },
         }),
         ctx.db.serviceAgreement.count({ where }),
       ]);
 
-      return { agreements, total };
+      return {
+        items: agreements,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        hasMore: (page + 1) * limit < total,
+      };
     }),
 
   /**
    * Get a single agreement by ID
    */
-  getById: agreementReadProcedure
-    .input(z.object({ id: z.string() }))
+  getById: agreementsReadProcedure.input(z.string()).query(async ({ ctx, input }) => {
+    const agreement = await ctx.db.serviceAgreement.findUnique({
+      where: { id: input },
+      include: {
+        installation: {
+          include: {
+            customer: true,
+          },
+        },
+        addons: {
+          include: {
+            addon: true,
+          },
+        },
+        visits: {
+          orderBy: { scheduledDate: "desc" },
+          take: 10,
+        },
+        servicePlan: true,
+      },
+    });
+
+    if (!agreement) {
+      throw new Error("Agreement not found");
+    }
+
+    return agreement;
+  }),
+
+  /**
+   * Calculate price for an agreement
+   */
+  calculatePrice: protectedProcedure
+    .input(
+      z.object({
+        agreementType: z.enum(["BASIC", "STANDARD", "PREMIUM", "ENTERPRISE"]),
+        slaLevel: z.enum(["STANDARD", "PRIORITY", "CRITICAL"]),
+        capacityKw: z.number().positive(),
+        systemType: z.enum(["SOLAR_PANEL", "BESS", "COMBINED"]),
+        addons: z.array(
+          z.object({
+            addonId: z.string(),
+            quantity: z.number().positive().default(1),
+          })
+        ).optional(),
+      })
+    )
     .query(async ({ ctx, input }) => {
-      const agreement = await ctx.db.serviceAgreement.findUnique({
-        where: { id: input.id },
+      const { agreementType, slaLevel, capacityKw, systemType, addons } = input;
+
+      // Base price
+      const basePrice = BASE_PRICES[agreementType] ?? 2500;
+      
+      // SLA multiplier
+      const slaMultiplier = SLA_MULTIPLIERS[slaLevel] ?? 1.0;
+      
+      // Capacity charge (per kW)
+      const capacityRate = systemType === "COMBINED" ? 75 : 50;
+      const capacityCharge = capacityKw * capacityRate;
+      
+      // Add-ons
+      let addonsTotal = 0;
+      const addonBreakdown: Array<{ item: string; amount: number }> = [];
+      
+      if (addons && addons.length > 0) {
+        const addonProducts = await ctx.db.addonProduct.findMany({
+          where: {
+            id: { in: addons.map((a) => a.addonId) },
+          },
+        });
+
+        for (const addonInput of addons) {
+          const product = addonProducts.find((p) => p.id === addonInput.addonId);
+          if (product) {
+            const amount = Number(product.basePrice) * addonInput.quantity;
+            addonsTotal += amount;
+            addonBreakdown.push({
+              item: `${product.name} x${addonInput.quantity}`,
+              amount,
+            });
+          }
+        }
+      }
+
+      // Calculate totals
+      const subtotal = (basePrice + capacityCharge) * slaMultiplier + addonsTotal;
+      const vatRate = 0.25;
+      const vatAmount = subtotal * vatRate;
+      const total = subtotal + vatAmount;
+
+      return {
+        basePrice,
+        slaMultiplier,
+        capacityCharge,
+        addonsTotal,
+        subtotal,
+        vatAmount,
+        total,
+        breakdown: [
+          { item: `Grunnpris (${agreementType})`, amount: basePrice },
+          { item: `Kapasitetstillegg (${capacityKw} kW)`, amount: capacityCharge },
+          ...(slaMultiplier !== 1 ? [{ item: `SLA-nivå (${slaLevel})`, amount: (basePrice + capacityCharge) * (slaMultiplier - 1) }] : []),
+          ...addonBreakdown,
+        ],
+      };
+    }),
+
+  /**
+   * Create a new agreement
+   */
+  create: agreementsWriteProcedure
+    .input(
+      z.object({
+        installationId: z.string(),
+        agreementType: z.enum(["BASIC", "STANDARD", "PREMIUM", "ENTERPRISE"]),
+        startDate: z.date(),
+        endDate: z.date().optional(),
+        basePrice: z.number().positive(),
+        slaLevel: z.enum(["STANDARD", "PRIORITY", "CRITICAL"]).default("STANDARD"),
+        autoRenew: z.boolean().default(true),
+        visitFrequency: z.number().min(1).max(12).default(1),
+        notes: z.string().optional(),
+        addons: z.array(
+          z.object({
+            addonId: z.string(),
+            quantity: z.number().positive().default(1),
+            customPrice: z.number().optional(),
+          })
+        ).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { addons, ...agreementData } = input;
+
+      // Verify installation exists
+      const installation = await ctx.db.installation.findUnique({
+        where: { id: input.installationId },
+      });
+
+      if (!installation) {
+        throw new Error("Installation not found");
+      }
+
+      // Create agreement with addons
+      const agreement = await ctx.db.serviceAgreement.create({
+        data: {
+          ...agreementData,
+          agreementNumber: generateAgreementNumber(),
+          status: "DRAFT",
+          addons: addons ? {
+            create: addons.map((addon) => ({
+              addonId: addon.addonId,
+              quantity: addon.quantity,
+              customPrice: addon.customPrice,
+            })),
+          } : undefined,
+          servicePlan: {
+            create: {
+              visitFrequency: input.visitFrequency,
+              seasonalAdjust: true,
+            },
+          },
+        },
         include: {
           installation: {
             include: {
@@ -162,95 +278,11 @@ export const agreementRouter = createTRPCRouter({
             },
           },
           addons: {
-            include: { addon: true },
-          },
-          visits: {
-            orderBy: { scheduledDate: "desc" },
-            take: 10,
-          },
-          invoices: {
-            orderBy: { createdAt: "desc" },
-            take: 10,
+            include: {
+              addon: true,
+            },
           },
           servicePlan: true,
-        },
-      });
-
-      if (!agreement) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Avtale ikke funnet",
-        });
-      }
-
-      return agreement;
-    }),
-
-  /**
-   * Create a new agreement
-   */
-  create: agreementWriteProcedure
-    .input(createAgreementSchema)
-    .mutation(async ({ ctx, input }) => {
-      const { addons, ...agreementData } = input;
-
-      // Generate agreement number
-      const lastAgreement = await ctx.db.serviceAgreement.findFirst({
-        orderBy: { createdAt: "desc" },
-        select: { agreementNumber: true },
-      });
-
-      const year = new Date().getFullYear();
-      const lastNumber = lastAgreement
-        ? parseInt(lastAgreement.agreementNumber.split("-")[1] ?? "0", 10)
-        : 0;
-      const agreementNumber = `SA-${String(lastNumber + 1).padStart(5, "0")}-${year}`;
-
-      // Calculate price
-      const calculatedPrice = calculateAgreementPrice({
-        basePrice: agreementData.basePrice,
-        discountPercent: agreementData.discountPercent,
-        addons: addons,
-        addonProducts: await ctx.db.addonProduct.findMany({
-          where: { id: { in: addons?.map((a) => a.addonId) ?? [] } },
-        }),
-      });
-
-      // Create agreement with addons
-      const agreement = await ctx.db.serviceAgreement.create({
-        data: {
-          ...agreementData,
-          agreementNumber,
-          calculatedPrice,
-          status: "DRAFT",
-          addons: addons
-            ? {
-                create: addons.map((addon) => ({
-                  addonId: addon.addonId,
-                  quantity: addon.quantity,
-                  customPrice: addon.customPrice,
-                  notes: addon.notes,
-                })),
-              }
-            : undefined,
-        },
-        include: {
-          installation: {
-            include: { customer: true },
-          },
-          addons: {
-            include: { addon: true },
-          },
-        },
-      });
-
-      // Create service plan
-      await ctx.db.servicePlan.create({
-        data: {
-          agreementId: agreement.id,
-          visitFrequency: agreementData.visitFrequency,
-          nextVisitDate: calculateNextVisitDate(agreementData.startDate, agreementData.visitFrequency),
-          seasonalAdj: true,
         },
       });
 
@@ -260,176 +292,130 @@ export const agreementRouter = createTRPCRouter({
   /**
    * Update an agreement
    */
-  update: agreementWriteProcedure
-    .input(updateAgreementSchema)
-    .mutation(async ({ ctx, input }) => {
-      const { id, addons, ...updateData } = input;
-
-      const existing = await ctx.db.serviceAgreement.findUnique({
-        where: { id },
-      });
-
-      if (!existing) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Avtale ikke funnet",
-        });
-      }
-
-      // Update addons if provided
-      if (addons) {
-        // Delete existing addons
-        await ctx.db.agreementAddon.deleteMany({
-          where: { agreementId: id },
-        });
-
-        // Create new addons
-        await ctx.db.agreementAddon.createMany({
-          data: addons.map((addon) => ({
-            agreementId: id,
-            addonId: addon.addonId,
-            quantity: addon.quantity,
-            customPrice: addon.customPrice,
-            notes: addon.notes,
-          })),
-        });
-      }
-
-      // Recalculate price if relevant fields changed
-      let calculatedPrice = existing.calculatedPrice;
-      if (updateData.basePrice || updateData.discountPercent || addons) {
-        const currentAddons = addons ?? (await ctx.db.agreementAddon.findMany({
-          where: { agreementId: id },
-          include: { addon: true },
-        }));
-
-        calculatedPrice = calculateAgreementPrice({
-          basePrice: updateData.basePrice ?? Number(existing.basePrice),
-          discountPercent: updateData.discountPercent ?? (existing.discountPercent ? Number(existing.discountPercent) : undefined),
-          addons: currentAddons.map((a) => ({
-            addonId: "addonId" in a ? a.addonId : a.addon.id,
-            quantity: a.quantity,
-            customPrice: a.customPrice ? Number(a.customPrice) : undefined,
-          })),
-          addonProducts: await ctx.db.addonProduct.findMany({
-            where: {
-              id: {
-                in: currentAddons.map((a) => ("addonId" in a ? a.addonId : a.addon.id)),
-              },
-            },
-          }),
-        });
-      }
-
-      return ctx.db.serviceAgreement.update({
-        where: { id },
-        data: {
-          ...updateData,
-          calculatedPrice,
-        },
-        include: {
-          installation: {
-            include: { customer: true },
-          },
-          addons: {
-            include: { addon: true },
-          },
-        },
-      });
-    }),
-
-  /**
-   * Cancel an agreement
-   */
-  cancel: agreementWriteProcedure
+  update: agreementsWriteProcedure
     .input(
       z.object({
         id: z.string(),
-        reason: z.string(),
+        agreementType: z.enum(["BASIC", "STANDARD", "PREMIUM", "ENTERPRISE"]).optional(),
+        status: z.enum(["DRAFT", "ACTIVE", "EXPIRED", "CANCELLED", "PENDING_RENEWAL"]).optional(),
+        startDate: z.date().optional(),
+        endDate: z.date().nullable().optional(),
+        basePrice: z.number().positive().optional(),
+        slaLevel: z.enum(["STANDARD", "PRIORITY", "CRITICAL"]).optional(),
+        autoRenew: z.boolean().optional(),
+        visitFrequency: z.number().min(1).max(12).optional(),
+        notes: z.string().nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      return ctx.db.serviceAgreement.update({
-        where: { id: input.id },
-        data: {
-          status: "CANCELLED",
-          cancelledAt: new Date(),
-          cancellationReason: input.reason,
+      const { id, ...data } = input;
+
+      const agreement = await ctx.db.serviceAgreement.update({
+        where: { id },
+        data,
+        include: {
+          installation: {
+            include: {
+              customer: true,
+            },
+          },
+          addons: {
+            include: {
+              addon: true,
+            },
+          },
         },
       });
+
+      return agreement;
     }),
 
   /**
-   * Activate a draft agreement
+   * Activate an agreement
    */
-  activate: agreementWriteProcedure
-    .input(z.object({ id: z.string() }))
+  activate: agreementsWriteProcedure
+    .input(z.string())
     .mutation(async ({ ctx, input }) => {
-      const agreement = await ctx.db.serviceAgreement.findUnique({
-        where: { id: input.id },
-      });
-
-      if (!agreement) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Avtale ikke funnet",
-        });
-      }
-
-      if (agreement.status !== "DRAFT" && agreement.status !== "PENDING_APPROVAL") {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Kan kun aktivere utkast eller ventende avtaler",
-        });
-      }
-
-      return ctx.db.serviceAgreement.update({
-        where: { id: input.id },
+      const agreement = await ctx.db.serviceAgreement.update({
+        where: { id: input },
         data: {
           status: "ACTIVE",
           signedAt: new Date(),
         },
       });
+
+      return agreement;
     }),
 
   /**
-   * Calculate price for an agreement configuration
+   * Cancel an agreement
    */
-  calculatePrice: agreementReadProcedure
+  cancel: agreementsWriteProcedure
     .input(
       z.object({
-        basePrice: z.number().positive(),
-        discountPercent: z.number().min(0).max(100).optional(),
-        addons: z
-          .array(
-            z.object({
-              addonId: z.string(),
-              quantity: z.number().min(1),
-              customPrice: z.number().optional(),
-            })
-          )
-          .optional(),
+        id: z.string(),
+        reason: z.string().optional(),
       })
     )
-    .query(async ({ ctx, input }) => {
-      const addonProducts = input.addons
-        ? await ctx.db.addonProduct.findMany({
-            where: { id: { in: input.addons.map((a) => a.addonId) } },
-          })
-        : [];
-
-      return calculatePriceBreakdown({
-        basePrice: input.basePrice,
-        discountPercent: input.discountPercent,
-        addons: input.addons,
-        addonProducts,
+    .mutation(async ({ ctx, input }) => {
+      const agreement = await ctx.db.serviceAgreement.update({
+        where: { id: input.id },
+        data: {
+          status: "CANCELLED",
+          notes: input.reason
+            ? `Cancelled: ${input.reason}`
+            : undefined,
+        },
       });
+
+      return agreement;
     }),
 
   /**
-   * Get addon products catalog
+   * Add addon to agreement
    */
-  getAddons: agreementReadProcedure
+  addAddon: agreementsWriteProcedure
+    .input(
+      z.object({
+        agreementId: z.string(),
+        addonId: z.string(),
+        quantity: z.number().positive().default(1),
+        customPrice: z.number().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const addon = await ctx.db.agreementAddon.create({
+        data: {
+          agreementId: input.agreementId,
+          addonId: input.addonId,
+          quantity: input.quantity,
+          customPrice: input.customPrice,
+        },
+        include: {
+          addon: true,
+        },
+      });
+
+      return addon;
+    }),
+
+  /**
+   * Remove addon from agreement
+   */
+  removeAddon: agreementsWriteProcedure
+    .input(z.string())
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db.agreementAddon.delete({
+        where: { id: input },
+      });
+
+      return { success: true };
+    }),
+
+  /**
+   * Get add-on products catalog
+   */
+  getAddonProducts: protectedProcedure
     .input(
       z.object({
         category: z.enum(["MAINTENANCE", "MONITORING", "PRIORITY", "EQUIPMENT"]).optional(),
@@ -437,141 +423,48 @@ export const agreementRouter = createTRPCRouter({
       }).optional()
     )
     .query(async ({ ctx, input }) => {
-      return ctx.db.addonProduct.findMany({
+      const products = await ctx.db.addonProduct.findMany({
         where: {
           ...(input?.category && { category: input.category }),
           isActive: input?.isActive ?? true,
         },
         orderBy: [{ category: "asc" }, { sortOrder: "asc" }],
       });
+
+      return products;
     }),
 
   /**
-   * Get agreement statistics
+   * Get agreements expiring soon
    */
-  getStats: agreementReadProcedure.query(async ({ ctx }) => {
-    const [total, active, expiringSoon, byType] = await Promise.all([
-      ctx.db.serviceAgreement.count(),
-      ctx.db.serviceAgreement.count({ where: { status: "ACTIVE" } }),
-      ctx.db.serviceAgreement.count({
+  getExpiring: agreementsReadProcedure
+    .input(
+      z.object({
+        days: z.number().min(1).max(365).default(30),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + input.days);
+
+      const agreements = await ctx.db.serviceAgreement.findMany({
         where: {
           status: "ACTIVE",
           endDate: {
+            lte: futureDate,
             gte: new Date(),
-            lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           },
         },
-      }),
-      ctx.db.serviceAgreement.groupBy({
-        by: ["agreementType"],
-        _count: true,
-        where: { status: "ACTIVE" },
-      }),
-    ]);
+        include: {
+          installation: {
+            include: {
+              customer: true,
+            },
+          },
+        },
+        orderBy: { endDate: "asc" },
+      });
 
-    return {
-      total,
-      active,
-      expiringSoon,
-      byType: Object.fromEntries(
-        byType.map((t) => [t.agreementType, t._count])
-      ),
-    };
-  }),
+      return agreements;
+    }),
 });
-
-// Helper functions
-function calculateAgreementPrice(params: {
-  basePrice: number;
-  discountPercent?: number;
-  addons?: Array<{ addonId: string; quantity: number; customPrice?: number }>;
-  addonProducts: Array<{ id: string; basePrice: unknown; frequency: string }>;
-}): number {
-  let total = params.basePrice;
-
-  // Add addon costs (only annual addons)
-  if (params.addons && params.addonProducts) {
-    for (const addon of params.addons) {
-      const product = params.addonProducts.find((p) => p.id === addon.addonId);
-      if (product && product.frequency === "ANNUAL") {
-        const price = addon.customPrice ?? Number(product.basePrice);
-        total += price * addon.quantity;
-      }
-    }
-  }
-
-  // Apply discount
-  if (params.discountPercent) {
-    total = total * (1 - params.discountPercent / 100);
-  }
-
-  return Math.round(total * 100) / 100;
-}
-
-function calculatePriceBreakdown(params: {
-  basePrice: number;
-  discountPercent?: number;
-  addons?: Array<{ addonId: string; quantity: number; customPrice?: number }>;
-  addonProducts: Array<{ id: string; name: string; basePrice: unknown; frequency: string }>;
-}) {
-  const breakdown: Array<{
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    total: number;
-  }> = [];
-
-  // Base price
-  breakdown.push({
-    description: "Serviceavtale grunnpris",
-    quantity: 1,
-    unitPrice: params.basePrice,
-    total: params.basePrice,
-  });
-
-  // Addons
-  let addonsTotal = 0;
-  if (params.addons && params.addonProducts) {
-    for (const addon of params.addons) {
-      const product = params.addonProducts.find((p) => p.id === addon.addonId);
-      if (product) {
-        const price = addon.customPrice ?? Number(product.basePrice);
-        const total = price * addon.quantity;
-        addonsTotal += total;
-        breakdown.push({
-          description: product.name,
-          quantity: addon.quantity,
-          unitPrice: price,
-          total,
-        });
-      }
-    }
-  }
-
-  const subtotal = params.basePrice + addonsTotal;
-  const discountAmount = params.discountPercent
-    ? subtotal * (params.discountPercent / 100)
-    : 0;
-  const total = subtotal - discountAmount;
-  const vatRate = 0.25;
-  const vatAmount = total * vatRate;
-  const grandTotal = total + vatAmount;
-
-  return {
-    basePrice: params.basePrice,
-    addonsTotal,
-    subtotal,
-    discountAmount,
-    total,
-    vatAmount,
-    grandTotal,
-    breakdown,
-  };
-}
-
-function calculateNextVisitDate(startDate: Date, visitFrequency: number): Date {
-  const nextVisit = new Date(startDate);
-  const monthsToAdd = Math.floor(12 / visitFrequency);
-  nextVisit.setMonth(nextVisit.getMonth() + monthsToAdd);
-  return nextVisit;
-}

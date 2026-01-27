@@ -1,84 +1,121 @@
 import { z } from "zod";
-import { createTRPCRouter, invoiceReadProcedure, invoiceWriteProcedure } from "~/server/api/trpc";
-import {
-  createInvoice,
-  sendInvoice,
-  syncInvoiceStatus,
-  createVisitInvoice,
-  getCustomerInvoices,
-} from "~/lib/tripletex";
+import { createTRPCRouter, protectedProcedure, invoicesWriteProcedure } from "~/server/api/trpc";
+import { tripletexInvoices } from "~/lib/tripletex";
 
-export const invoiceRouter = createTRPCRouter({
+export const invoicesRouter = createTRPCRouter({
   /**
-   * Get all invoices with filters
+   * Get all invoices from local database
    */
-  getAll: invoiceReadProcedure
+  getAll: protectedProcedure
     .input(
       z.object({
-        status: z.enum(["DRAFT", "PENDING", "SENT", "PAID", "OVERDUE", "CANCELLED"]).optional(),
-        customerId: z.string().optional(),
-        agreementId: z.string().optional(),
-        fromDate: z.date().optional(),
-        toDate: z.date().optional(),
-        limit: z.number().min(1).max(100).default(50),
-        offset: z.number().min(0).default(0),
-      }).optional()
+        status: z.enum(["DRAFT", "SENT", "PAID", "OVERDUE", "CANCELLED"]).optional(),
+        visitId: z.string().optional(),
+        page: z.number().min(0).default(0),
+        limit: z.number().min(1).max(100).default(20),
+      })
     )
     .query(async ({ ctx, input }) => {
-      const where: Record<string, unknown> = {};
+      const { status, visitId, page, limit } = input;
 
-      if (input?.status) where.status = input.status;
-      if (input?.customerId) where.customerId = input.customerId;
-      if (input?.agreementId) where.agreementId = input.agreementId;
-      if (input?.fromDate || input?.toDate) {
-        where.createdAt = {
-          ...(input.fromDate && { gte: input.fromDate }),
-          ...(input.toDate && { lte: input.toDate }),
-        };
-      }
+      const where = {
+        ...(status && { status }),
+        ...(visitId && { visitId }),
+      };
 
       const [invoices, total] = await Promise.all([
         ctx.db.invoice.findMany({
           where,
-          take: input?.limit ?? 50,
-          skip: input?.offset ?? 0,
+          skip: page * limit,
+          take: limit,
           orderBy: { createdAt: "desc" },
           include: {
-            agreement: {
-              select: {
-                id: true,
-                agreementNumber: true,
-                installation: {
-                  select: {
-                    id: true,
-                    name: true,
-                    address: true,
-                    customer: {
-                      select: {
-                        tripletexId: true,
-                        name: true,
+            visit: {
+              include: {
+                agreement: {
+                  include: {
+                    installation: {
+                      include: {
+                        customer: true,
                       },
                     },
                   },
                 },
               },
             },
+            lineItems: true,
           },
         }),
         ctx.db.invoice.count({ where }),
       ]);
 
-      return { invoices, total };
+      return {
+        items: invoices,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        hasMore: (page + 1) * limit < total,
+      };
     }),
 
   /**
-   * Get a single invoice by ID
+   * Get invoice by ID
    */
-  getById: invoiceReadProcedure
-    .input(z.object({ id: z.string() }))
-    .query(async ({ ctx, input }) => {
-      return ctx.db.invoice.findUnique({
-        where: { id: input.id },
+  getById: protectedProcedure.input(z.string()).query(async ({ ctx, input }) => {
+    const invoice = await ctx.db.invoice.findUnique({
+      where: { id: input },
+      include: {
+        visit: {
+          include: {
+            agreement: {
+              include: {
+                installation: {
+                  include: {
+                    customer: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        lineItems: true,
+      },
+    });
+
+    if (!invoice) {
+      throw new Error("Invoice not found");
+    }
+
+    return invoice;
+  }),
+
+  /**
+   * Create invoice for a service visit
+   */
+  createForVisit: invoicesWriteProcedure
+    .input(
+      z.object({
+        visitId: z.string(),
+        lines: z.array(
+          z.object({
+            description: z.string(),
+            quantity: z.number().positive(),
+            unitPrice: z.number().positive(),
+            vatRate: z.number().min(0).max(100).default(25),
+            tripletexProductId: z.number().optional(),
+          })
+        ),
+        dueInDays: z.number().min(1).default(14),
+        notes: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { visitId, lines, dueInDays, notes } = input;
+
+      // Get visit with customer info
+      const visit = await ctx.db.serviceVisit.findUnique({
+        where: { id: visitId },
         include: {
           agreement: {
             include: {
@@ -91,136 +128,190 @@ export const invoiceRouter = createTRPCRouter({
           },
         },
       });
-    }),
 
-  /**
-   * Create a new invoice
-   */
-  create: invoiceWriteProcedure
-    .input(
-      z.object({
-        customerId: z.string(),
-        agreementId: z.string().optional(),
-        invoiceDate: z.date(),
-        dueDate: z.date(),
-        lines: z.array(
-          z.object({
-            description: z.string(),
-            quantity: z.number().positive(),
-            unitPrice: z.number(),
-            productId: z.string().optional(),
-            vatTypeId: z.number().optional(),
-          })
-        ),
-        comment: z.string().optional(),
-      })
-    )
-    .mutation(async ({ input }) => {
-      return createInvoice(input);
-    }),
+      if (!visit) {
+        throw new Error("Visit not found");
+      }
 
-  /**
-   * Create invoice from a completed visit
-   */
-  createFromVisit: invoiceWriteProcedure
-    .input(z.object({ visitId: z.string() }))
-    .mutation(async ({ input }) => {
-      return createVisitInvoice(input.visitId);
-    }),
+      const customer = visit.agreement.installation.customer;
+      const invoiceDate = new Date();
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + dueInDays);
 
-  /**
-   * Send an invoice
-   */
-  send: invoiceWriteProcedure
-    .input(
-      z.object({
-        tripletexId: z.number(),
-        sendType: z.enum(["EMAIL", "EHF"]).default("EMAIL"),
-      })
-    )
-    .mutation(async ({ input }) => {
-      return sendInvoice(input.tripletexId, input.sendType);
-    }),
-
-  /**
-   * Sync invoice status from Tripletex
-   */
-  syncStatus: invoiceReadProcedure
-    .input(z.object({ tripletexId: z.number() }))
-    .mutation(async ({ input }) => {
-      await syncInvoiceStatus(input.tripletexId);
-      return { success: true };
-    }),
-
-  /**
-   * Get customer invoices from Tripletex
-   */
-  getCustomerInvoices: invoiceReadProcedure
-    .input(
-      z.object({
-        customerId: z.string(),
-        fromDate: z.date().optional(),
-        toDate: z.date().optional(),
-        limit: z.number().min(1).max(100).default(50),
-      })
-    )
-    .query(async ({ input }) => {
-      return getCustomerInvoices(input.customerId, {
-        fromDate: input.fromDate,
-        toDate: input.toDate,
-        limit: input.limit,
+      // Calculate totals
+      const lineItems = lines.map((line) => {
+        const totalPrice = line.quantity * line.unitPrice;
+        const vatAmount = totalPrice * (line.vatRate / 100);
+        return {
+          description: line.description,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          totalPrice,
+          vatRate: line.vatRate,
+          tripletexProductId: line.tripletexProductId,
+        };
       });
-    }),
 
-  /**
-   * Get invoice statistics/summary
-   */
-  getStats: invoiceReadProcedure.query(async ({ ctx }) => {
-    const [pending, sent, overdue, paidThisMonth] = await Promise.all([
-      ctx.db.invoice.aggregate({
-        where: { status: "PENDING" },
-        _sum: { totalAmount: true },
-        _count: true,
-      }),
-      ctx.db.invoice.aggregate({
-        where: { status: "SENT" },
-        _sum: { totalAmount: true },
-        _count: true,
-      }),
-      ctx.db.invoice.aggregate({
-        where: { status: "OVERDUE" },
-        _sum: { totalAmount: true },
-        _count: true,
-      }),
-      ctx.db.invoice.aggregate({
-        where: {
-          status: "PAID",
-          paidAt: {
-            gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+      const amount = lineItems.reduce((sum, line) => sum + line.totalPrice, 0);
+      const vatAmount = lineItems.reduce(
+        (sum, line) => sum + line.totalPrice * (line.vatRate / 100),
+        0
+      );
+      const totalAmount = amount + vatAmount;
+
+      // Create invoice in Tripletex
+      let tripletexId: number | null = null;
+      try {
+        const tripletexInvoice = await tripletexInvoices.createForVisit({
+          customerId: customer.tripletexId,
+          invoiceDate,
+          dueInDays,
+          lines: lines.map((line) => ({
+            description: line.description,
+            quantity: line.quantity,
+            unitPrice: line.unitPrice,
+            productId: line.tripletexProductId,
+          })),
+          comment: notes,
+        });
+        tripletexId = tripletexInvoice.id;
+      } catch (error) {
+        console.error("Failed to create Tripletex invoice:", error);
+        // Continue without Tripletex ID - can retry later
+      }
+
+      // Create local invoice
+      const invoice = await ctx.db.invoice.create({
+        data: {
+          visitId,
+          tripletexId,
+          amount,
+          vatAmount,
+          totalAmount,
+          status: tripletexId ? "SENT" : "DRAFT",
+          dueDate,
+          sentAt: tripletexId ? new Date() : null,
+          notes,
+          lineItems: {
+            create: lineItems.map((item) => ({
+              description: item.description,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              totalPrice: item.totalPrice,
+              vatRate: item.vatRate,
+              tripletexProductId: item.tripletexProductId,
+            })),
           },
         },
-        _sum: { totalAmount: true },
-        _count: true,
-      }),
-    ]);
+        include: {
+          lineItems: true,
+        },
+      });
 
-    return {
-      pending: {
-        count: pending._count,
-        total: Number(pending._sum.totalAmount ?? 0),
-      },
-      sent: {
-        count: sent._count,
-        total: Number(sent._sum.totalAmount ?? 0),
-      },
-      overdue: {
-        count: overdue._count,
-        total: Number(overdue._sum.totalAmount ?? 0),
-      },
-      paidThisMonth: {
-        count: paidThisMonth._count,
-        total: Number(paidThisMonth._sum.totalAmount ?? 0),
-      },
-    };
-  }),
+      return invoice;
+    }),
+
+  /**
+   * Mark invoice as paid
+   */
+  markPaid: invoicesWriteProcedure
+    .input(z.string())
+    .mutation(async ({ ctx, input }) => {
+      const invoice = await ctx.db.invoice.update({
+        where: { id: input },
+        data: {
+          status: "PAID",
+          paidAt: new Date(),
+        },
+      });
+
+      return invoice;
+    }),
+
+  /**
+   * Cancel invoice
+   */
+  cancel: invoicesWriteProcedure
+    .input(z.string())
+    .mutation(async ({ ctx, input }) => {
+      const invoice = await ctx.db.invoice.update({
+        where: { id: input },
+        data: {
+          status: "CANCELLED",
+        },
+      });
+
+      return invoice;
+    }),
+
+  /**
+   * Retry sending invoice to Tripletex
+   */
+  retrySend: invoicesWriteProcedure
+    .input(z.string())
+    .mutation(async ({ ctx, input }) => {
+      const invoice = await ctx.db.invoice.findUnique({
+        where: { id: input },
+        include: {
+          visit: {
+            include: {
+              agreement: {
+                include: {
+                  installation: {
+                    include: {
+                      customer: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          lineItems: true,
+        },
+      });
+
+      if (!invoice) {
+        throw new Error("Invoice not found");
+      }
+
+      if (invoice.tripletexId) {
+        throw new Error("Invoice already sent to Tripletex");
+      }
+
+      const customer = invoice.visit?.agreement.installation.customer;
+      if (!customer) {
+        throw new Error("Customer not found");
+      }
+
+      // Create in Tripletex
+      const tripletexInvoice = await tripletexInvoices.createForVisit({
+        customerId: customer.tripletexId,
+        invoiceDate: invoice.createdAt,
+        dueInDays: invoice.dueDate
+          ? Math.ceil(
+              (invoice.dueDate.getTime() - invoice.createdAt.getTime()) /
+                (1000 * 60 * 60 * 24)
+            )
+          : 14,
+        lines: invoice.lineItems.map((item) => ({
+          description: item.description,
+          quantity: Number(item.quantity),
+          unitPrice: Number(item.unitPrice),
+          productId: item.tripletexProductId ?? undefined,
+        })),
+        comment: invoice.notes ?? undefined,
+      });
+
+      // Update local invoice
+      const updated = await ctx.db.invoice.update({
+        where: { id: input },
+        data: {
+          tripletexId: tripletexInvoice.id,
+          status: "SENT",
+          sentAt: new Date(),
+        },
+      });
+
+      return updated;
+    }),
 });

@@ -11,11 +11,487 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Post {
-  id        Int      @id @default(autoincrement())
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+// ============================================
+// ENUMS
+// ============================================
 
+enum SystemType {
+  SOLAR_PANEL
+  BESS
+  COMBINED
+}
+
+enum AgreementType {
+  BASIC
+  STANDARD
+  PREMIUM
+  ENTERPRISE
+}
+
+enum AgreementStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  PENDING_RENEWAL
+}
+
+enum SlaLevel {
+  STANDARD
+  PRIORITY
+  CRITICAL
+}
+
+enum VisitStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  BLOCKED
+}
+
+enum VisitType {
+  ANNUAL_INSPECTION
+  SEMI_ANNUAL
+  QUARTERLY
+  EMERGENCY
+  REPAIR
+  INSTALLATION
+}
+
+enum ChecklistStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ChecklistItemStatus {
+  PENDING
+  PASSED
+  FAILED
+  NOT_APPLICABLE
+}
+
+enum ItemSeverity {
+  CRITICAL
+  SERIOUS
+  MODERATE
+  MINOR
+}
+
+enum InputType {
+  YES_NO
+  YES_NO_NA
+  NUMERIC
+  TEXT
+  MULTIPLE_CHOICE
+  IMAGE
+  SIGNATURE
+  GPS
+  TEMPERATURE
+  ELECTRICAL_MEASUREMENT
+}
+
+enum AddonCategory {
+  MAINTENANCE
+  MONITORING
+  PRIORITY
+  EQUIPMENT
+}
+
+enum AddonUnit {
+  PER_UNIT
+  PER_VISIT
+  PER_MONTH
+  PER_YEAR
+  PER_SQM
+  FLAT_RATE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+// ============================================
+// CUSTOMER DATA (Cached from Tripletex - READ-ONLY)
+// ============================================
+
+model CustomerCache {
+  id              String   @id @default(cuid())
+  tripletexId     Int      @unique
+  name            String
+  orgNumber       String?
+  contactPerson   String?
+  email           String?
+  phone           String?
+  postalAddress   String?
+  physicalAddress String?
+  invoiceEmail    String?
+  syncedAt        DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  installations Installation[]
+
+  @@index([tripletexId])
   @@index([name])
+  @@map("customer_cache")
+}
+
+// ============================================
+// INSTALLATIONS
+// ============================================
+
+model Installation {
+  id             String     @id @default(cuid())
+  customerId     String
+  address        String
+  city           String?
+  postalCode     String?
+  latitude       Float?
+  longitude      Float?
+  systemType     SystemType
+  capacityKw     Decimal    @db.Decimal(10, 2)
+  installDate    DateTime
+  inverterType   String?
+  inverterSerial String?
+  panelCount     Int?
+  panelType      String?
+  batteryKwh     Decimal?   @db.Decimal(10, 2)
+  batteryType    String?
+  monitoringId   String?
+  notes          String?
+  isActive       Boolean    @default(true)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  // Relations
+  customer   CustomerCache      @relation(fields: [customerId], references: [id])
+  agreements ServiceAgreement[]
+
+  @@index([customerId])
+  @@index([city])
+  @@map("installations")
+}
+
+// ============================================
+// SERVICE AGREEMENTS
+// ============================================
+
+model ServiceAgreement {
+  id                 String          @id @default(cuid())
+  installationId     String
+  agreementNumber    String          @unique
+  agreementType      AgreementType
+  status             AgreementStatus @default(DRAFT)
+  startDate          DateTime
+  endDate            DateTime?
+  basePrice          Decimal         @db.Decimal(10, 2)
+  slaLevel           SlaLevel        @default(STANDARD)
+  autoRenew          Boolean         @default(true)
+  visitFrequency     Int             @default(1) // visits per year
+  notes              String?
+  signedAt           DateTime?
+  signedBy           String?
+  tripletexProjectId Int?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  // Relations
+  installation Installation     @relation(fields: [installationId], references: [id])
+  visits       ServiceVisit[]
+  addons       AgreementAddon[]
+  servicePlan  ServicePlan?
+
+  @@index([installationId])
+  @@index([status])
+  @@index([agreementType])
+  @@map("service_agreements")
+}
+
+model ServicePlan {
+  id             String    @id @default(cuid())
+  agreementId    String    @unique
+  visitFrequency Int       @default(1)
+  nextVisit      DateTime?
+  visitWindow    Int       @default(14) // days
+  preferredDay   String? // e.g., "Monday", "Tuesday"
+  preferredTime  String? // e.g., "morning", "afternoon"
+  seasonalAdjust Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  agreement ServiceAgreement @relation(fields: [agreementId], references: [id])
+
+  @@map("service_plans")
+}
+
+// ============================================
+// ADD-ON PRODUCTS
+// ============================================
+
+model AddonProduct {
+  id                 String        @id @default(cuid())
+  name               String
+  description        String?
+  category           AddonCategory
+  basePrice          Decimal       @db.Decimal(10, 2)
+  unit               AddonUnit
+  isRecurring        Boolean       @default(false)
+  isActive           Boolean       @default(true)
+  tripletexProductId Int?
+  sortOrder          Int           @default(0)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  // Relations
+  agreementAddons AgreementAddon[]
+
+  @@index([category])
+  @@index([isActive])
+  @@map("addon_products")
+}
+
+model AgreementAddon {
+  id          String   @id @default(cuid())
+  agreementId String
+  addonId     String
+  quantity    Int      @default(1)
+  customPrice Decimal? @db.Decimal(10, 2)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  agreement ServiceAgreement @relation(fields: [agreementId], references: [id])
+  addon     AddonProduct     @relation(fields: [addonId], references: [id])
+
+  @@unique([agreementId, addonId])
+  @@map("agreement_addons")
+}
+
+// ============================================
+// SERVICE VISITS
+// ============================================
+
+model ServiceVisit {
+  id                String      @id @default(cuid())
+  agreementId       String
+  technicianId      String // Reference to @energismart/shared Employee
+  scheduledDate     DateTime
+  scheduledEndDate  DateTime?
+  actualStartDate   DateTime?
+  actualEndDate     DateTime?
+  status            VisitStatus @default(SCHEDULED)
+  visitType         VisitType
+  durationMinutes   Int?
+  notes             String?
+  customerNotes     String?
+  customerSignature String?
+  signedAt          DateTime?
+  travelTimeMinutes Int?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  agreement  ServiceAgreement @relation(fields: [agreementId], references: [id])
+  checklists Checklist[]
+  photos     VisitPhoto[]
+  invoices   Invoice[]
+
+  @@index([agreementId])
+  @@index([technicianId])
+  @@index([scheduledDate])
+  @@index([status])
+  @@map("service_visits")
+}
+
+model VisitPhoto {
+  id        String   @id @default(cuid())
+  visitId   String
+  url       String
+  caption   String?
+  category  String? // "before", "after", "damage", "general"
+  latitude  Float?
+  longitude Float?
+  takenAt   DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  // Relations
+  visit ServiceVisit @relation(fields: [visitId], references: [id])
+
+  @@index([visitId])
+  @@map("visit_photos")
+}
+
+// ============================================
+// CHECKLISTS
+// ============================================
+
+model ChecklistTemplate {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  systemType  SystemType
+  visitType   VisitType
+  version     Int        @default(1)
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  items      ChecklistTemplateItem[]
+  checklists Checklist[]
+
+  @@unique([name, version])
+  @@index([systemType])
+  @@index([visitType])
+  @@map("checklist_templates")
+}
+
+model ChecklistTemplateItem {
+  id               String    @id @default(cuid())
+  templateId       String
+  category         String
+  description      String
+  inputType        InputType
+  isMandatory      Boolean   @default(false)
+  photoRequired    Boolean   @default(false)
+  minValue         Float?
+  maxValue         Float?
+  options          String? // JSON array for multiple choice
+  helpText         String?
+  sortOrder        Int       @default(0)
+  conditionalOn    String? // ID of another item this depends on
+  conditionalValue String? // Value that triggers this item
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  template ChecklistTemplate @relation(fields: [templateId], references: [id])
+
+  @@index([templateId])
+  @@index([category])
+  @@map("checklist_template_items")
+}
+
+model Checklist {
+  id           String          @id @default(cuid())
+  visitId      String
+  templateId   String
+  technicianId String
+  status       ChecklistStatus @default(NOT_STARTED)
+  startedAt    DateTime?
+  completedAt  DateTime?
+  aiSummary    String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  // Relations
+  visit    ServiceVisit      @relation(fields: [visitId], references: [id])
+  template ChecklistTemplate @relation(fields: [templateId], references: [id])
+  items    ChecklistItem[]
+
+  @@index([visitId])
+  @@index([templateId])
+  @@map("checklists")
+}
+
+model ChecklistItem {
+  id           String              @id @default(cuid())
+  checklistId  String
+  category     String
+  description  String
+  inputType    InputType
+  status       ChecklistItemStatus @default(PENDING)
+  value        String? // Stored as string, parsed based on inputType
+  numericValue Float?
+  notes        String?
+  photoUrl     String?
+  severity     ItemSeverity?
+  completedAt  DateTime?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  // Relations
+  checklist Checklist @relation(fields: [checklistId], references: [id])
+
+  @@index([checklistId])
+  @@index([status])
+  @@map("checklist_items")
+}
+
+// ============================================
+// INVOICING
+// ============================================
+
+model Invoice {
+  id            String        @id @default(cuid())
+  visitId       String?
+  tripletexId   Int?          @unique
+  invoiceNumber String?
+  amount        Decimal       @db.Decimal(10, 2)
+  vatAmount     Decimal       @db.Decimal(10, 2)
+  totalAmount   Decimal       @db.Decimal(10, 2)
+  status        InvoiceStatus @default(DRAFT)
+  dueDate       DateTime?
+  sentAt        DateTime?
+  paidAt        DateTime?
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  visit     ServiceVisit?     @relation(fields: [visitId], references: [id])
+  lineItems InvoiceLineItem[]
+
+  @@index([visitId])
+  @@index([status])
+  @@index([tripletexId])
+  @@map("invoices")
+}
+
+model InvoiceLineItem {
+  id                 String   @id @default(cuid())
+  invoiceId          String
+  description        String
+  quantity           Decimal  @db.Decimal(10, 2)
+  unitPrice          Decimal  @db.Decimal(10, 2)
+  totalPrice         Decimal  @db.Decimal(10, 2)
+  vatRate            Decimal  @default(25.00) @db.Decimal(5, 2)
+  tripletexProductId Int?
+  createdAt          DateTime @default(now())
+
+  // Relations
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+  @@map("invoice_line_items")
+}
+
+// ============================================
+// REPORTS
+// ============================================
+
+model ServiceReport {
+  id              String    @id @default(cuid())
+  visitId         String    @unique
+  title           String
+  summary         String
+  findings        String // JSON array of findings
+  recommendations String // JSON array of recommendations
+  generatedBy     String // "AI" or technician ID
+  pdfUrl          String?
+  sentAt          DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([visitId])
+  @@map("service_reports")
 }

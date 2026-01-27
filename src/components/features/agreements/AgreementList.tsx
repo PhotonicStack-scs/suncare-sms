@@ -40,19 +40,18 @@ export function AgreementList({ className }: AgreementListProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<AgreementStatus[]>([]);
 
-  const { data, isLoading } = api.agreement.getAll.useQuery({
+  const { data, isLoading } = api.agreements.getAll.useQuery({
     search: search || undefined,
-    status: statusFilter.length > 0 ? statusFilter : undefined,
+    status: statusFilter.length === 1 ? statusFilter[0] : undefined,
     limit: 50,
   });
 
-  const agreements = data?.agreements ?? [];
+  const agreements = data?.items ?? [];
 
   const statusMap: Record<AgreementStatus, "scheduled" | "inProgress" | "completed" | "blocked" | "pending"> = {
     DRAFT: "pending",
-    PENDING_APPROVAL: "pending",
+    PENDING_RENEWAL: "pending",
     ACTIVE: "completed",
-    SUSPENDED: "blocked",
     EXPIRED: "blocked",
     CANCELLED: "blocked",
   };

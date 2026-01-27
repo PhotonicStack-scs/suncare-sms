@@ -1,19 +1,20 @@
 "use client";
 
 import * as React from "react";
-import { cn } from "~/lib/utils";
 import { cva, type VariantProps } from "class-variance-authority";
 
+import { cn } from "~/lib/utils";
+
 const avatarVariants = cva(
-  "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted",
+  "relative flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted",
   {
     variants: {
       size: {
-        xs: "size-6 text-xs",
-        sm: "size-8 text-sm",
-        default: "size-10 text-base",
-        lg: "size-12 text-lg",
-        xl: "size-16 text-xl",
+        xs: "size-6 text-[10px]",
+        sm: "size-8 text-xs",
+        default: "size-10 text-sm",
+        lg: "size-12 text-base",
+        xl: "size-16 text-lg",
       },
     },
     defaultVariants: {
@@ -24,90 +25,128 @@ const avatarVariants = cva(
 
 interface AvatarProps
   extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof avatarVariants> {
-  src?: string | null;
-  alt?: string;
-  fallback?: string;
-}
+    VariantProps<typeof avatarVariants> {}
 
-function Avatar({
-  className,
-  size,
-  src,
-  alt,
-  fallback,
-  ...props
-}: AvatarProps) {
-  const [hasError, setHasError] = React.useState(false);
-
-  const showImage = src && !hasError;
-  const initials = fallback ?? getInitials(alt ?? "");
-
+function Avatar({ className, size, ...props }: AvatarProps) {
   return (
-    <div className={cn(avatarVariants({ size }), className)} {...props}>
-      {showImage ? (
-        <img
-          src={src}
-          alt={alt}
-          className="size-full object-cover"
-          onError={() => setHasError(true)}
-        />
-      ) : (
-        <span className="font-medium text-muted-foreground">{initials}</span>
-      )}
-    </div>
+    <div
+      data-slot="avatar"
+      className={cn(avatarVariants({ size }), className)}
+      {...props}
+    />
   );
 }
 
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 0) return "";
-  if (parts.length === 1) return parts[0]?.charAt(0).toUpperCase() ?? "";
+function AvatarImage({
+  className,
+  src,
+  alt,
+  ...props
+}: React.ImgHTMLAttributes<HTMLImageElement>) {
+  const [hasError, setHasError] = React.useState(false);
+
+  if (hasError || !src) {
+    return null;
+  }
+
   return (
-    (parts[0]?.charAt(0) ?? "") + (parts[parts.length - 1]?.charAt(0) ?? "")
-  ).toUpperCase();
+    <img
+      data-slot="avatar-image"
+      src={src}
+      alt={alt}
+      className={cn("aspect-square size-full object-cover", className)}
+      onError={() => setHasError(true)}
+      {...props}
+    />
+  );
 }
 
-interface AvatarGroupProps {
-  children: React.ReactNode;
-  max?: number;
-  size?: VariantProps<typeof avatarVariants>["size"];
+function AvatarFallback({
+  className,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLSpanElement>) {
+  return (
+    <span
+      data-slot="avatar-fallback"
+      className={cn(
+        "flex size-full items-center justify-center rounded-full bg-primary font-semibold text-primary-foreground",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </span>
+  );
+}
+
+// Utility to get initials from name
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
+// Pre-built user avatar component
+interface UserAvatarProps extends VariantProps<typeof avatarVariants> {
+  name: string;
+  imageUrl?: string;
   className?: string;
 }
 
-function AvatarGroup({
-  children,
-  max = 4,
-  size = "default",
-  className,
-}: AvatarGroupProps) {
+function UserAvatar({ name, imageUrl, size, className }: UserAvatarProps) {
+  return (
+    <Avatar size={size} className={className}>
+      {imageUrl && <AvatarImage src={imageUrl} alt={name} />}
+      <AvatarFallback>{getInitials(name)}</AvatarFallback>
+    </Avatar>
+  );
+}
+
+// Avatar group for showing multiple users
+interface AvatarGroupProps {
+  children: React.ReactNode;
+  max?: number;
+  className?: string;
+}
+
+function AvatarGroup({ children, max = 4, className }: AvatarGroupProps) {
   const childArray = React.Children.toArray(children);
-  const visibleAvatars = childArray.slice(0, max);
-  const extraCount = childArray.length - max;
+  const visibleChildren = childArray.slice(0, max);
+  const remaining = childArray.length - max;
 
   return (
     <div className={cn("flex -space-x-2", className)}>
-      {visibleAvatars.map((child, index) => (
-        <div key={index} className="ring-2 ring-background rounded-full">
-          {React.isValidElement<AvatarProps>(child)
-            ? React.cloneElement(child, { size })
-            : child}
+      {visibleChildren.map((child, index) => (
+        <div
+          key={index}
+          className="ring-2 ring-background"
+          style={{ zIndex: visibleChildren.length - index }}
+        >
+          {child}
         </div>
       ))}
-      {extraCount > 0 && (
-        <div
-          className={cn(
-            avatarVariants({ size }),
-            "ring-2 ring-background bg-muted"
-          )}
-        >
-          <span className="text-xs font-medium text-muted-foreground">
-            +{extraCount}
-          </span>
-        </div>
+      {remaining > 0 && (
+        <Avatar size="sm" className="ring-2 ring-background">
+          <AvatarFallback className="bg-muted text-muted-foreground">
+            +{remaining}
+          </AvatarFallback>
+        </Avatar>
       )}
     </div>
   );
 }
 
-export { Avatar, AvatarGroup, avatarVariants };
+export {
+  Avatar,
+  AvatarImage,
+  AvatarFallback,
+  UserAvatar,
+  AvatarGroup,
+  avatarVariants,
+  getInitials,
+};

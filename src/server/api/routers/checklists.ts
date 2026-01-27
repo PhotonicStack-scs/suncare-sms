@@ -1,65 +1,58 @@
 import { z } from "zod";
-import { TRPCError } from "@trpc/server";
 import {
   createTRPCRouter,
   protectedProcedure,
-  createPermissionProcedure,
+  checklistsReadProcedure,
+  checklistsWriteProcedure,
 } from "~/server/api/trpc";
 
-const checklistReadProcedure = createPermissionProcedure("checklists:read");
-const checklistWriteProcedure = createPermissionProcedure("checklists:write");
-const checklistTemplateProcedure = createPermissionProcedure("checklists:templates");
-
-const updateItemSchema = z.object({
-  id: z.string(),
-  status: z.enum(["PENDING", "OK", "NOT_OK", "NOT_APPLICABLE"]),
-  value: z.string().optional(),
-  numericValue: z.number().optional(),
-  notes: z.string().optional(),
-  severity: z.enum(["CRITICAL", "SERIOUS", "MODERATE", "MINOR", "INFO"]).optional(),
-  photoUrls: z.array(z.string()).optional(),
-  gpsLatitude: z.number().optional(),
-  gpsLongitude: z.number().optional(),
-});
-
-export const checklistRouter = createTRPCRouter({
+export const checklistsRouter = createTRPCRouter({
   /**
    * Get all checklist templates
    */
-  getTemplates: checklistReadProcedure
+  getTemplates: checklistsReadProcedure
     .input(
       z.object({
-        systemType: z.enum(["SOLAR", "BESS", "HYBRID"]).optional(),
+        systemType: z.enum(["SOLAR_PANEL", "BESS", "COMBINED"]).optional(),
         visitType: z
-          .enum(["ANNUAL_INSPECTION", "SEMI_ANNUAL", "QUARTERLY", "TROUBLESHOOTING", "EMERGENCY", "WARRANTY"])
+          .enum([
+            "ANNUAL_INSPECTION",
+            "SEMI_ANNUAL",
+            "QUARTERLY",
+            "EMERGENCY",
+            "REPAIR",
+            "INSTALLATION",
+          ])
           .optional(),
         isActive: z.boolean().default(true),
       }).optional()
     )
     .query(async ({ ctx, input }) => {
-      return ctx.db.checklistTemplate.findMany({
+      const templates = await ctx.db.checklistTemplate.findMany({
         where: {
           ...(input?.systemType && { systemType: input.systemType }),
           ...(input?.visitType && { visitType: input.visitType }),
           isActive: input?.isActive ?? true,
         },
         include: {
-          items: {
-            orderBy: [{ category: "asc" }, { sortOrder: "asc" }],
+          _count: {
+            select: { items: true },
           },
         },
         orderBy: { name: "asc" },
       });
+
+      return templates;
     }),
 
   /**
-   * Get a single checklist template
+   * Get template by ID with items
    */
-  getTemplate: checklistReadProcedure
-    .input(z.object({ id: z.string() }))
+  getTemplateById: checklistsReadProcedure
+    .input(z.string())
     .query(async ({ ctx, input }) => {
       const template = await ctx.db.checklistTemplate.findUnique({
-        where: { id: input.id },
+        where: { id: input },
         include: {
           items: {
             orderBy: [{ category: "asc" }, { sortOrder: "asc" }],
@@ -68,105 +61,100 @@ export const checklistRouter = createTRPCRouter({
       });
 
       if (!template) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Sjekklistemal ikke funnet",
-        });
+        throw new Error("Template not found");
       }
 
       return template;
     }),
 
   /**
-   * Get a checklist by ID
+   * Get checklist by ID
    */
-  getById: checklistReadProcedure
-    .input(z.object({ id: z.string() }))
-    .query(async ({ ctx, input }) => {
-      const checklist = await ctx.db.checklist.findUnique({
-        where: { id: input.id },
-        include: {
-          items: {
-            orderBy: [{ category: "asc" }, { code: "asc" }],
-          },
-          template: true,
-          visit: {
-            include: {
-              agreement: {
-                include: {
-                  installation: {
-                    include: { customer: true },
+  getById: checklistsReadProcedure.input(z.string()).query(async ({ ctx, input }) => {
+    const checklist = await ctx.db.checklist.findUnique({
+      where: { id: input },
+      include: {
+        template: true,
+        items: {
+          orderBy: [{ category: "asc" }],
+        },
+        visit: {
+          include: {
+            agreement: {
+              include: {
+                installation: {
+                  include: {
+                    customer: true,
                   },
                 },
               },
             },
           },
         },
-      });
+      },
+    });
 
-      if (!checklist) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Sjekkliste ikke funnet",
-        });
-      }
+    if (!checklist) {
+      throw new Error("Checklist not found");
+    }
 
-      return checklist;
-    }),
+    return checklist;
+  }),
 
   /**
    * Get checklists for a visit
    */
-  getByVisit: checklistReadProcedure
-    .input(z.object({ visitId: z.string() }))
-    .query(async ({ ctx, input }) => {
-      return ctx.db.checklist.findMany({
-        where: { visitId: input.visitId },
-        include: {
-          items: {
-            orderBy: [{ category: "asc" }, { code: "asc" }],
-          },
-          template: true,
+  getByVisit: checklistsReadProcedure.input(z.string()).query(async ({ ctx, input }) => {
+    const checklists = await ctx.db.checklist.findMany({
+      where: { visitId: input },
+      include: {
+        template: true,
+        items: true,
+        _count: {
+          select: { items: true },
         },
-      });
-    }),
+      },
+    });
+
+    return checklists;
+  }),
 
   /**
-   * Create a checklist from template for a visit
+   * Create a checklist for a visit from template
    */
-  createFromTemplate: checklistWriteProcedure
+  createFromTemplate: checklistsWriteProcedure
     .input(
       z.object({
         visitId: z.string(),
         templateId: z.string(),
+        technicianId: z.string(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       // Get template with items
       const template = await ctx.db.checklistTemplate.findUnique({
         where: { id: input.templateId },
-        include: { items: true },
+        include: {
+          items: {
+            orderBy: [{ category: "asc" }, { sortOrder: "asc" }],
+          },
+        },
       });
 
       if (!template) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Sjekklistemal ikke funnet",
-        });
+        throw new Error("Template not found");
       }
 
-      // Create checklist with items
-      return ctx.db.checklist.create({
+      // Create checklist with items from template
+      const checklist = await ctx.db.checklist.create({
         data: {
           visitId: input.visitId,
           templateId: input.templateId,
-          technicianId: ctx.user.employeeId ?? ctx.user.id,
-          status: "PENDING",
+          technicianId: input.technicianId,
+          status: "NOT_STARTED",
           items: {
             create: template.items.map((item) => ({
-              templateItemId: item.id,
               category: item.category,
-              code: item.code,
               description: item.description,
               inputType: item.inputType,
               status: "PENDING",
@@ -174,219 +162,183 @@ export const checklistRouter = createTRPCRouter({
           },
         },
         include: {
-          items: true,
           template: true,
+          items: true,
         },
       });
+
+      return checklist;
     }),
 
   /**
    * Start a checklist
    */
-  start: checklistWriteProcedure
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      return ctx.db.checklist.update({
-        where: { id: input.id },
-        data: {
-          status: "IN_PROGRESS",
-          startedAt: new Date(),
-        },
-      });
-    }),
+  start: checklistsWriteProcedure.input(z.string()).mutation(async ({ ctx, input }) => {
+    const checklist = await ctx.db.checklist.update({
+      where: { id: input },
+      data: {
+        status: "IN_PROGRESS",
+        startedAt: new Date(),
+      },
+    });
+
+    return checklist;
+  }),
 
   /**
    * Update a checklist item
    */
-  updateItem: checklistWriteProcedure
-    .input(updateItemSchema)
-    .mutation(async ({ ctx, input }) => {
-      const { id, ...updateData } = input;
-
-      return ctx.db.checklistItem.update({
-        where: { id },
-        data: {
-          ...updateData,
-          completedAt: updateData.status !== "PENDING" ? new Date() : null,
-        },
-      });
-    }),
-
-  /**
-   * Update multiple checklist items at once
-   */
-  updateItems: checklistWriteProcedure
+  updateItem: checklistsWriteProcedure
     .input(
       z.object({
-        checklistId: z.string(),
-        items: z.array(updateItemSchema),
+        itemId: z.string(),
+        status: z.enum(["PENDING", "PASSED", "FAILED", "NOT_APPLICABLE"]).optional(),
+        value: z.string().nullable().optional(),
+        numericValue: z.number().nullable().optional(),
+        notes: z.string().nullable().optional(),
+        photoUrl: z.string().nullable().optional(),
+        severity: z.enum(["CRITICAL", "SERIOUS", "MODERATE", "MINOR"]).nullable().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const updates = input.items.map((item) =>
-        ctx.db.checklistItem.update({
-          where: { id: item.id },
-          data: {
-            status: item.status,
-            value: item.value,
-            numericValue: item.numericValue,
-            notes: item.notes,
-            severity: item.severity,
-            photoUrls: item.photoUrls,
-            gpsLatitude: item.gpsLatitude,
-            gpsLongitude: item.gpsLongitude,
-            completedAt: item.status !== "PENDING" ? new Date() : null,
-          },
-        })
-      );
+      const { itemId, ...data } = input;
 
-      await ctx.db.$transaction(updates);
-
-      return ctx.db.checklist.findUnique({
-        where: { id: input.checklistId },
-        include: { items: true },
+      const item = await ctx.db.checklistItem.update({
+        where: { id: itemId },
+        data: {
+          ...data,
+          completedAt: data.status && data.status !== "PENDING" ? new Date() : undefined,
+        },
       });
+
+      return item;
     }),
 
   /**
    * Complete a checklist
    */
-  complete: checklistWriteProcedure
+  complete: checklistsWriteProcedure
     .input(
       z.object({
         id: z.string(),
-        notes: z.string().optional(),
+        items: z.array(
+          z.object({
+            itemId: z.string(),
+            status: z.enum(["PENDING", "PASSED", "FAILED", "NOT_APPLICABLE"]),
+            value: z.string().optional(),
+            numericValue: z.number().optional(),
+            notes: z.string().optional(),
+            severity: z.enum(["CRITICAL", "SERIOUS", "MODERATE", "MINOR"]).optional(),
+          })
+        ),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Check all mandatory items are completed
-      const checklist = await ctx.db.checklist.findUnique({
+      // Update all items
+      await Promise.all(
+        input.items.map((item) =>
+          ctx.db.checklistItem.update({
+            where: { id: item.itemId },
+            data: {
+              status: item.status,
+              value: item.value,
+              numericValue: item.numericValue,
+              notes: item.notes,
+              severity: item.severity,
+              completedAt: new Date(),
+            },
+          })
+        )
+      );
+
+      // Mark checklist as completed
+      const checklist = await ctx.db.checklist.update({
         where: { id: input.id },
+        data: {
+          status: "COMPLETED",
+          completedAt: new Date(),
+        },
         include: {
           items: true,
-          template: {
-            include: { items: true },
+        },
+      });
+
+      return checklist;
+    }),
+
+  /**
+   * Get checklist items grouped by category
+   */
+  getItemsByCategory: checklistsReadProcedure
+    .input(z.string())
+    .query(async ({ ctx, input }) => {
+      const checklist = await ctx.db.checklist.findUnique({
+        where: { id: input },
+        include: {
+          items: {
+            orderBy: { category: "asc" },
           },
         },
       });
 
       if (!checklist) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Sjekkliste ikke funnet",
-        });
+        throw new Error("Checklist not found");
       }
 
-      // Find incomplete mandatory items
-      const mandatoryTemplateItems = checklist.template.items
-        .filter((t) => t.isMandatory)
-        .map((t) => t.id);
-
-      const incompleteItems = checklist.items.filter(
-        (item) =>
-          item.templateItemId &&
-          mandatoryTemplateItems.includes(item.templateItemId) &&
-          item.status === "PENDING"
+      // Group items by category
+      const grouped = checklist.items.reduce(
+        (acc, item) => {
+          if (!acc[item.category]) {
+            acc[item.category] = [];
+          }
+          acc[item.category].push(item);
+          return acc;
+        },
+        {} as Record<string, typeof checklist.items>
       );
 
-      if (incompleteItems.length > 0) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `${incompleteItems.length} obligatoriske punkter må fullføres`,
-        });
-      }
-
-      return ctx.db.checklist.update({
-        where: { id: input.id },
-        data: {
-          status: "COMPLETED",
-          completedAt: new Date(),
-          notes: input.notes,
-        },
-      });
+      // Transform to array with stats
+      return Object.entries(grouped).map(([category, items]) => ({
+        category,
+        items,
+        completedCount: items.filter((i) => i.status !== "PENDING").length,
+        totalCount: items.length,
+      }));
     }),
 
   /**
-   * Add ad-hoc item to checklist
+   * Get checklist summary for a visit (findings count by severity)
    */
-  addItem: checklistWriteProcedure
-    .input(
-      z.object({
-        checklistId: z.string(),
-        category: z.string(),
-        code: z.string(),
-        description: z.string(),
-        inputType: z.string().default("YES_NO"),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      return ctx.db.checklistItem.create({
-        data: {
-          checklistId: input.checklistId,
-          category: input.category,
-          code: input.code,
-          description: input.description,
-          inputType: input.inputType,
-          status: "PENDING",
-        },
-      });
-    }),
+  getVisitSummary: checklistsReadProcedure.input(z.string()).query(async ({ ctx, input }) => {
+    const checklists = await ctx.db.checklist.findMany({
+      where: { visitId: input },
+      include: {
+        items: true,
+      },
+    });
 
-  /**
-   * Get checklist summary/statistics
-   */
-  getSummary: checklistReadProcedure
-    .input(z.object({ id: z.string() }))
-    .query(async ({ ctx, input }) => {
-      const checklist = await ctx.db.checklist.findUnique({
-        where: { id: input.id },
-        include: { items: true },
-      });
+    // Count findings by severity
+    const findings = {
+      critical: 0,
+      serious: 0,
+      moderate: 0,
+      minor: 0,
+    };
 
-      if (!checklist) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Sjekkliste ikke funnet",
-        });
+    for (const checklist of checklists) {
+      for (const item of checklist.items) {
+        if (item.status === "FAILED" && item.severity) {
+          const key = item.severity.toLowerCase() as keyof typeof findings;
+          findings[key]++;
+        }
       }
+    }
 
-      const items = checklist.items;
-      const total = items.length;
-      const completed = items.filter((i) => i.status !== "PENDING").length;
-      const ok = items.filter((i) => i.status === "OK").length;
-      const notOk = items.filter((i) => i.status === "NOT_OK").length;
-      const notApplicable = items.filter((i) => i.status === "NOT_APPLICABLE").length;
-
-      const findingsBySeverity = {
-        CRITICAL: items.filter((i) => i.severity === "CRITICAL").length,
-        SERIOUS: items.filter((i) => i.severity === "SERIOUS").length,
-        MODERATE: items.filter((i) => i.severity === "MODERATE").length,
-        MINOR: items.filter((i) => i.severity === "MINOR").length,
-        INFO: items.filter((i) => i.severity === "INFO").length,
-      };
-
-      // Group by category
-      const categories = [...new Set(items.map((i) => i.category))];
-      const byCategory = categories.map((cat) => {
-        const categoryItems = items.filter((i) => i.category === cat);
-        return {
-          name: cat,
-          total: categoryItems.length,
-          completed: categoryItems.filter((i) => i.status !== "PENDING").length,
-          hasIssues: categoryItems.some((i) => i.status === "NOT_OK"),
-        };
-      });
-
-      return {
-        total,
-        completed,
-        pending: total - completed,
-        ok,
-        notOk,
-        notApplicable,
-        progress: total > 0 ? Math.round((completed / total) * 100) : 0,
-        findingsBySeverity,
-        byCategory,
-      };
-    }),
+    return {
+      totalChecklists: checklists.length,
+      completedChecklists: checklists.filter((c) => c.status === "COMPLETED").length,
+      findings,
+      hasIssues: findings.critical > 0 || findings.serious > 0,
+    };
+  }),
 });

@@ -1,86 +1,96 @@
 import { env } from "~/env";
-import type {
-  TripletexListResponse,
-  TripletexSingleResponse,
-  TripletexCustomer,
-  TripletexProduct,
-  TripletexInvoice,
-  CreateTripletexInvoice,
+import type { 
+  TripletexResponse, 
+  TripletexListResponse, 
+  TripletexTokenResponse 
 } from "~/types/tripletex";
+
+// Session token cache
+let sessionToken: string | null = null;
+let tokenExpiry: Date | null = null;
 
 /**
  * Tripletex API Client
- * Handles authentication and API requests to Tripletex
+ * Handles authentication and HTTP requests to Tripletex API
  */
 class TripletexClient {
   private baseUrl: string;
-  private sessionToken: string | null = null;
-  private sessionExpires: Date | null = null;
+  private consumerToken: string;
+  private employeeToken: string;
 
   constructor() {
     this.baseUrl = env.TRIPLETEX_API_BASE_URL;
+    this.consumerToken = env.TRIPLETEX_CONSUMER_TOKEN;
+    this.employeeToken = env.TRIPLETEX_EMPLOYEE_TOKEN;
   }
 
   /**
    * Get or create a session token
    */
   private async getSessionToken(): Promise<string> {
-    // Check if existing session is still valid (with 5 min buffer)
-    if (this.sessionToken && this.sessionExpires) {
-      const bufferMs = 5 * 60 * 1000;
-      if (this.sessionExpires.getTime() - bufferMs > Date.now()) {
-        return this.sessionToken;
-      }
+    // Check if we have a valid cached token
+    if (sessionToken && tokenExpiry && tokenExpiry > new Date()) {
+      return sessionToken;
     }
 
-    // Create new session
-    const response = await fetch(`${this.baseUrl}/token/session/:create`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Basic ${Buffer.from(
-          `0:${env.TRIPLETEX_CONSUMER_TOKEN}`
-        ).toString("base64")}`,
-      },
-      body: JSON.stringify({
-        employeeToken: env.TRIPLETEX_EMPLOYEE_TOKEN,
-        expirationDate: new Date(Date.now() + 24 * 60 * 60 * 1000)
-          .toISOString()
-          .split("T")[0],
-      }),
-    });
+    // Create new session token
+    const expirationDate = new Date();
+    expirationDate.setDate(expirationDate.getDate() + 1); // 1 day expiry
+
+    const response = await fetch(
+      `${this.baseUrl}/token/session/:create?consumerToken=${this.consumerToken}&employeeToken=${this.employeeToken}&expirationDate=${expirationDate.toISOString().split("T")[0]}`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Failed to create Tripletex session: ${error}`);
+      throw new Error(`Failed to create Tripletex session: ${response.statusText}`);
     }
 
-    const data = (await response.json()) as TripletexSingleResponse<{
-      token: string;
-      expirationDate: string;
-    }>;
+    const data = await response.json() as TripletexTokenResponse;
+    sessionToken = data.value.token;
+    tokenExpiry = new Date(data.value.expirationDate);
 
-    this.sessionToken = data.value.token;
-    this.sessionExpires = new Date(data.value.expirationDate);
-
-    return this.sessionToken;
+    return sessionToken;
   }
 
   /**
-   * Make an authenticated API request
+   * Get authorization header for API requests
    */
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
+  private async getAuthHeader(): Promise<string> {
     const token = await this.getSessionToken();
+    // Tripletex uses Basic auth with 0:token
+    return `Basic ${Buffer.from(`0:${token}`).toString("base64")}`;
+  }
 
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      ...options,
+  /**
+   * Make a GET request to Tripletex API
+   */
+  async get<T>(
+    endpoint: string,
+    params?: Record<string, string | number | boolean | undefined>
+  ): Promise<TripletexResponse<T>> {
+    const url = new URL(`${this.baseUrl}${endpoint}`);
+    
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          url.searchParams.append(key, String(value));
+        }
+      });
+    }
+
+    const authHeader = await this.getAuthHeader();
+    
+    const response = await fetch(url.toString(), {
+      method: "GET",
       headers: {
+        "Authorization": authHeader,
         "Content-Type": "application/json",
-        Authorization: `Basic ${Buffer.from(`0:${token}`).toString("base64")}`,
-        ...options.headers,
       },
     });
 
@@ -89,172 +99,96 @@ class TripletexClient {
       throw new Error(`Tripletex API error: ${response.status} - ${error}`);
     }
 
-    return response.json() as Promise<T>;
+    return response.json() as Promise<TripletexResponse<T>>;
   }
 
   /**
-   * GET request helper
+   * Make a GET request that returns a list
    */
-  async get<T>(endpoint: string, params?: Record<string, string>): Promise<T> {
-    const url = params
-      ? `${endpoint}?${new URLSearchParams(params).toString()}`
-      : endpoint;
-    return this.request<T>(url, { method: "GET" });
+  async getList<T>(
+    endpoint: string,
+    params?: Record<string, string | number | boolean | undefined>
+  ): Promise<TripletexListResponse<T>> {
+    const url = new URL(`${this.baseUrl}${endpoint}`);
+    
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          url.searchParams.append(key, String(value));
+        }
+      });
+    }
+
+    const authHeader = await this.getAuthHeader();
+    
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "Authorization": authHeader,
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Tripletex API error: ${response.status} - ${error}`);
+    }
+
+    return response.json() as Promise<TripletexListResponse<T>>;
   }
 
   /**
-   * POST request helper
+   * Make a POST request to Tripletex API
    */
-  async post<T>(endpoint: string, body: unknown): Promise<T> {
-    return this.request<T>(endpoint, {
+  async post<T, B>(endpoint: string, body: B): Promise<TripletexResponse<T>> {
+    const authHeader = await this.getAuthHeader();
+    
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
       method: "POST",
+      headers: {
+        "Authorization": authHeader,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify(body),
     });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Tripletex API error: ${response.status} - ${error}`);
+    }
+
+    return response.json() as Promise<TripletexResponse<T>>;
   }
 
   /**
-   * PUT request helper
+   * Make a PUT request to Tripletex API
    */
-  async put<T>(endpoint: string, body: unknown): Promise<T> {
-    return this.request<T>(endpoint, {
+  async put<T, B>(endpoint: string, body: B): Promise<TripletexResponse<T>> {
+    const authHeader = await this.getAuthHeader();
+    
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
       method: "PUT",
+      headers: {
+        "Authorization": authHeader,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify(body),
     });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Tripletex API error: ${response.status} - ${error}`);
+    }
+
+    return response.json() as Promise<TripletexResponse<T>>;
   }
 
   /**
-   * DELETE request helper
+   * Clear cached session token
    */
-  async delete(endpoint: string): Promise<void> {
-    await this.request(endpoint, { method: "DELETE" });
-  }
-
-  // ==========================================
-  // Customer endpoints
-  // ==========================================
-
-  async getCustomers(params?: {
-    id?: string;
-    customerAccountNumber?: string;
-    organizationNumber?: string;
-    email?: string;
-    isSupplier?: boolean;
-    isCustomer?: boolean;
-    isInactive?: boolean;
-    from?: number;
-    count?: number;
-  }): Promise<TripletexListResponse<TripletexCustomer>> {
-    const queryParams: Record<string, string> = {};
-
-    if (params?.id) queryParams.id = params.id;
-    if (params?.customerAccountNumber)
-      queryParams.customerAccountNumber = params.customerAccountNumber;
-    if (params?.organizationNumber)
-      queryParams.organizationNumber = params.organizationNumber;
-    if (params?.email) queryParams.email = params.email;
-    if (params?.isSupplier !== undefined)
-      queryParams.isSupplier = String(params.isSupplier);
-    if (params?.isCustomer !== undefined)
-      queryParams.isCustomer = String(params.isCustomer);
-    if (params?.isInactive !== undefined)
-      queryParams.isInactive = String(params.isInactive);
-    if (params?.from !== undefined) queryParams.from = String(params.from);
-    if (params?.count !== undefined) queryParams.count = String(params.count);
-
-    return this.get<TripletexListResponse<TripletexCustomer>>(
-      "/customer",
-      queryParams
-    );
-  }
-
-  async getCustomer(id: number): Promise<TripletexSingleResponse<TripletexCustomer>> {
-    return this.get<TripletexSingleResponse<TripletexCustomer>>(`/customer/${id}`);
-  }
-
-  async searchCustomers(
-    query: string,
-    limit = 20
-  ): Promise<TripletexListResponse<TripletexCustomer>> {
-    return this.get<TripletexListResponse<TripletexCustomer>>("/customer", {
-      isCustomer: "true",
-      isInactive: "false",
-      count: String(limit),
-    });
-  }
-
-  // ==========================================
-  // Product endpoints
-  // ==========================================
-
-  async getProducts(params?: {
-    number?: string;
-    name?: string;
-    isInactive?: boolean;
-    from?: number;
-    count?: number;
-  }): Promise<TripletexListResponse<TripletexProduct>> {
-    const queryParams: Record<string, string> = {};
-
-    if (params?.number) queryParams.number = params.number;
-    if (params?.name) queryParams.name = params.name;
-    if (params?.isInactive !== undefined)
-      queryParams.isInactive = String(params.isInactive);
-    if (params?.from !== undefined) queryParams.from = String(params.from);
-    if (params?.count !== undefined) queryParams.count = String(params.count);
-
-    return this.get<TripletexListResponse<TripletexProduct>>(
-      "/product",
-      queryParams
-    );
-  }
-
-  async getProduct(id: number): Promise<TripletexSingleResponse<TripletexProduct>> {
-    return this.get<TripletexSingleResponse<TripletexProduct>>(`/product/${id}`);
-  }
-
-  // ==========================================
-  // Invoice endpoints
-  // ==========================================
-
-  async getInvoices(params?: {
-    id?: string;
-    invoiceDateFrom?: string;
-    invoiceDateTo?: string;
-    customerId?: string;
-    from?: number;
-    count?: number;
-  }): Promise<TripletexListResponse<TripletexInvoice>> {
-    const queryParams: Record<string, string> = {};
-
-    if (params?.id) queryParams.id = params.id;
-    if (params?.invoiceDateFrom)
-      queryParams.invoiceDateFrom = params.invoiceDateFrom;
-    if (params?.invoiceDateTo) queryParams.invoiceDateTo = params.invoiceDateTo;
-    if (params?.customerId) queryParams["customer.id"] = params.customerId;
-    if (params?.from !== undefined) queryParams.from = String(params.from);
-    if (params?.count !== undefined) queryParams.count = String(params.count);
-
-    return this.get<TripletexListResponse<TripletexInvoice>>(
-      "/invoice",
-      queryParams
-    );
-  }
-
-  async getInvoice(id: number): Promise<TripletexSingleResponse<TripletexInvoice>> {
-    return this.get<TripletexSingleResponse<TripletexInvoice>>(`/invoice/${id}`);
-  }
-
-  async createInvoice(
-    invoice: CreateTripletexInvoice
-  ): Promise<TripletexSingleResponse<TripletexInvoice>> {
-    return this.post<TripletexSingleResponse<TripletexInvoice>>(
-      "/invoice",
-      invoice
-    );
-  }
-
-  async sendInvoice(id: number, sendType: "EMAIL" | "EHF" = "EMAIL"): Promise<void> {
-    await this.put(`/invoice/${id}/:send`, { sendType });
+  clearSession(): void {
+    sessionToken = null;
+    tokenExpiry = null;
   }
 }
 

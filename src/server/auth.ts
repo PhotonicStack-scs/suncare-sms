@@ -1,200 +1,150 @@
 import "server-only";
 
-// Re-export auth functions from @energismart/shared
-// Note: This file serves as a local adapter for the shared auth package
+import type { 
+  SystemUser, 
+  Employee,
+  Permission,
+  SuncareRole,
+} from "@energismart/shared";
 
-export type UserRole = "ADMIN" | "SERVICE_MANAGER" | "PLANNER" | "TECHNICIAN" | "FINANCE";
+import { 
+  hasPermission, 
+  hasAppAccess,
+  getAppRole,
+  getAppPermissions,
+  getEmployee,
+  isEmployeeAvailable
+} from "@energismart/shared";
 
-export interface SystemUser {
-  id: string;
-  email: string;
-  name: string;
-  image?: string;
-  role: UserRole;
-  permissions: string[];
-  employeeId?: string;
+// App identifier for permission checks (matches @energismart/shared)
+export const APP_ID = "suncare";
+
+// Permission types for this app (matching @energismart/shared Permission type)
+export type AppPermission = 
+  | "service:read"
+  | "service:write"
+  | "service:delete"
+  | "service:dispatch"
+  | "service:checklists"
+  | "service:reports"
+  | "service:invoicing"
+  | "service:customer_portal"
+  | "agreements:read"
+  | "agreements:write"
+  | "agreements:delete"
+  | "installations:read"
+  | "installations:write"
+  | "employees:read"
+  | "employees:write"
+  | "settings:read"
+  | "settings:write";
+
+// Legacy permission mapping for backwards compatibility with existing procedures
+// Maps local permission names to @energismart/shared Permission names
+const PERMISSION_MAP: Record<string, Permission> = {
+  "visits:read": "service:read",
+  "visits:write": "service:write",
+  "checklists:read": "service:checklists",
+  "checklists:write": "service:checklists",
+  "invoices:read": "service:invoicing",
+  "invoices:write": "service:invoicing",
+  "reports:read": "service:reports",
+  "reports:generate": "service:reports",
+  "admin:full": "admin:system",
+};
+
+// Check if user has access to this app
+export function checkAppAccess(user: SystemUser | null): boolean {
+  if (!user) return false;
+  return hasAppAccess(user, APP_ID);
 }
 
-export interface Session {
+// Check if user has specific permission
+export function checkPermission(user: SystemUser | null, permission: string): boolean {
+  if (!user) return false;
+  
+  // Super admins have all permissions
+  if (user.globalRole === "super_admin") {
+    return true;
+  }
+  
+  // Map legacy permission names to @energismart/shared names
+  const mappedPermission = PERMISSION_MAP[permission] ?? permission;
+  
+  // Check if user has permission via @energismart/shared
+  if (hasPermission(user, mappedPermission as Permission)) {
+    return true;
+  }
+  
+  // Also check role-based permissions for suncare
+  const userPermissions = getAppPermissions(user, APP_ID);
+  return userPermissions.includes(mappedPermission as Permission);
+}
+
+// Get user's role in this app
+export function getUserRole(user: SystemUser | null): SuncareRole | null {
+  if (!user) return null;
+  
+  // Super admins are treated as service_lead
+  if (user.globalRole === "super_admin") {
+    return "service_lead";
+  }
+  
+  // Get role from app access
+  const role = getAppRole(user, APP_ID);
+  return role as SuncareRole | null;
+}
+
+// Get employee data for a user
+export async function getEmployeeForUser(userId: string): Promise<Employee | null> {
+  try {
+    const employee = await getEmployee(userId);
+    return employee;
+  } catch {
+    return null;
+  }
+}
+
+// Check if employee is available on a date
+export async function checkEmployeeAvailability(
+  employeeId: string,
+  date: string
+): Promise<{ available: boolean; blockedBy?: string }> {
+  try {
+    const availability = await isEmployeeAvailable(employeeId, date);
+    return availability;
+  } catch {
+    return { available: false, blockedBy: "Error checking availability" };
+  }
+}
+
+// Session type for our app
+export interface AppSession {
   user: SystemUser;
-  expires: string;
+  employee: Employee | null;
+  role: SuncareRole | null;
+  permissions: Permission[];
 }
 
-// App-specific permissions
-export const APP_PERMISSIONS = {
-  // Agreements
-  "agreements:read": "View service agreements",
-  "agreements:write": "Create and edit agreements",
-  "agreements:delete": "Delete agreements",
-  "agreements:approve": "Approve agreements",
-
-  // Visits
-  "visits:read": "View service visits",
-  "visits:write": "Create and schedule visits",
-  "visits:complete": "Complete visits and checklists",
-  "visits:assign": "Assign technicians to visits",
-
-  // Checklists
-  "checklists:read": "View checklists",
-  "checklists:write": "Edit checklists",
-  "checklists:templates": "Manage checklist templates",
-
-  // Invoices
-  "invoices:read": "View invoices",
-  "invoices:write": "Create invoices",
-  "invoices:approve": "Approve invoices",
-
-  // Reports
-  "reports:read": "View reports",
-  "reports:generate": "Generate reports",
-
-  // Admin
-  "admin:users": "Manage users",
-  "admin:settings": "Manage settings",
-  "admin:integrations": "Manage integrations",
-} as const;
-
-export type Permission = keyof typeof APP_PERMISSIONS;
-
-// Role-permission mappings
-export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  ADMIN: Object.keys(APP_PERMISSIONS) as Permission[],
-  SERVICE_MANAGER: [
-    "agreements:read",
-    "agreements:write",
-    "agreements:approve",
-    "visits:read",
-    "visits:write",
-    "visits:complete",
-    "visits:assign",
-    "checklists:read",
-    "checklists:write",
-    "checklists:templates",
-    "invoices:read",
-    "reports:read",
-    "reports:generate",
-  ],
-  PLANNER: [
-    "agreements:read",
-    "visits:read",
-    "visits:write",
-    "visits:assign",
-    "checklists:read",
-    "reports:read",
-  ],
-  TECHNICIAN: [
-    "agreements:read",
-    "visits:read",
-    "visits:complete",
-    "checklists:read",
-    "checklists:write",
-    "reports:read",
-  ],
-  FINANCE: [
-    "agreements:read",
-    "visits:read",
-    "checklists:read",
-    "invoices:read",
-    "invoices:write",
-    "invoices:approve",
-    "reports:read",
-    "reports:generate",
-  ],
-};
-
-/**
- * Check if user has a specific permission
- */
-export function hasPermission(user: SystemUser | null, permission: Permission): boolean {
-  if (!user) return false;
+// Get full session with employee data
+export async function getAppSession(user: SystemUser | null): Promise<AppSession | null> {
+  if (!user) return null;
+  if (!checkAppAccess(user)) return null;
   
-  // Admin has all permissions
-  if (user.role === "ADMIN") return true;
+  const role = getUserRole(user);
+  const permissions = getAppPermissions(user, APP_ID);
   
-  // Check explicit permissions
-  if (user.permissions.includes(permission)) return true;
-  
-  // Check role-based permissions
-  return ROLE_PERMISSIONS[user.role]?.includes(permission) ?? false;
-}
-
-/**
- * Check if user has any of the specified permissions
- */
-export function hasAnyPermission(user: SystemUser | null, permissions: Permission[]): boolean {
-  return permissions.some((p) => hasPermission(user, p));
-}
-
-/**
- * Check if user has all of the specified permissions
- */
-export function hasAllPermissions(user: SystemUser | null, permissions: Permission[]): boolean {
-  return permissions.every((p) => hasPermission(user, p));
-}
-
-/**
- * Check if user has access to this app
- */
-export function hasAppAccess(user: SystemUser | null): boolean {
-  if (!user) return false;
-  // All defined roles have access to this app
-  return Object.keys(ROLE_PERMISSIONS).includes(user.role);
-}
-
-/**
- * Get all permissions for a user
- */
-export function getUserPermissions(user: SystemUser): Permission[] {
-  const rolePermissions = ROLE_PERMISSIONS[user.role] ?? [];
-  const explicitPermissions = user.permissions.filter(
-    (p): p is Permission => p in APP_PERMISSIONS
-  );
-  return [...new Set([...rolePermissions, ...explicitPermissions])];
-}
-
-// Mock session for development (replace with actual @energismart/shared integration)
-let mockSession: Session | null = null;
-
-export async function getSession(): Promise<Session | null> {
-  // TODO: Replace with actual @energismart/shared session handling
-  // import { getSession as getSharedSession } from '@energismart/shared';
-  // return getSharedSession();
-  
-  if (process.env.NODE_ENV === "development" && mockSession) {
-    return mockSession;
+  let employee: Employee | null = null;
+  try {
+    employee = await getEmployee(user.id);
+  } catch {
+    // Employee data not available
   }
   
-  return null;
-}
-
-export async function getCurrentUser(): Promise<SystemUser | null> {
-  const session = await getSession();
-  return session?.user ?? null;
-}
-
-// Development helper to set mock session
-export function setMockSession(session: Session | null): void {
-  if (process.env.NODE_ENV === "development") {
-    mockSession = session;
-  }
-}
-
-// Create a development user for testing
-export const DEV_USER: SystemUser = {
-  id: "dev-user-1",
-  email: "dev@energismart.no",
-  name: "Developer User",
-  role: "ADMIN",
-  permissions: [],
-  employeeId: "emp-1",
-};
-
-export const DEV_SESSION: Session = {
-  user: DEV_USER,
-  expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-};
-
-// Initialize mock session in development
-if (process.env.NODE_ENV === "development") {
-  mockSession = DEV_SESSION;
+  return {
+    user,
+    employee,
+    role,
+    permissions,
+  };
 }

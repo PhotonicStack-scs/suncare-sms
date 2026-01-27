@@ -1,210 +1,192 @@
-import type { Checklist } from "./checklists";
-import type { ServiceAgreement } from "./agreements";
-import type { Installation } from "./installations";
+import type { Decimal } from "@prisma/client/runtime/library";
 
-// Enums matching Prisma
-export type VisitStatus = "SCHEDULED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED" | "RESCHEDULED";
-export type VisitType = "ANNUAL_INSPECTION" | "SEMI_ANNUAL" | "QUARTERLY" | "TROUBLESHOOTING" | "EMERGENCY" | "WARRANTY";
+// Visit Types
+export type VisitStatus = "SCHEDULED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED" | "BLOCKED";
+export type VisitType = "ANNUAL_INSPECTION" | "SEMI_ANNUAL" | "QUARTERLY" | "EMERGENCY" | "REPAIR" | "INSTALLATION";
 
-export const visitStatusLabels: Record<VisitStatus, string> = {
-  SCHEDULED: "Planlagt",
-  IN_PROGRESS: "Pågår",
-  COMPLETED: "Fullført",
-  CANCELLED: "Kansellert",
-  RESCHEDULED: "Omplassert",
+export const VISIT_STATUS_INFO: Record<VisitStatus, {
+  label: string;
+  labelNo: string;
+  color: "scheduled" | "in-progress" | "completed" | "cancelled" | "blocked";
+}> = {
+  SCHEDULED: { label: "Scheduled", labelNo: "Planlagt", color: "scheduled" },
+  IN_PROGRESS: { label: "In Progress", labelNo: "Pågår", color: "in-progress" },
+  COMPLETED: { label: "Completed", labelNo: "Fullført", color: "completed" },
+  CANCELLED: { label: "Cancelled", labelNo: "Kansellert", color: "cancelled" },
+  BLOCKED: { label: "Blocked", labelNo: "Blokkert", color: "blocked" },
 };
 
-export const visitTypeLabels: Record<VisitType, string> = {
-  ANNUAL_INSPECTION: "Årlig inspeksjon",
-  SEMI_ANNUAL: "Halvårlig service",
-  QUARTERLY: "Kvartalsvis service",
-  TROUBLESHOOTING: "Feilsøking",
-  EMERGENCY: "Akutt",
-  WARRANTY: "Garanti",
+export const VISIT_TYPE_INFO: Record<VisitType, {
+  label: string;
+  labelNo: string;
+  description: string;
+  typicalDuration: number; // minutes
+}> = {
+  ANNUAL_INSPECTION: {
+    label: "Annual Inspection",
+    labelNo: "Årlig inspeksjon",
+    description: "Full annual service inspection",
+    typicalDuration: 120,
+  },
+  SEMI_ANNUAL: {
+    label: "Semi-Annual",
+    labelNo: "Halvårlig",
+    description: "Bi-annual maintenance visit",
+    typicalDuration: 90,
+  },
+  QUARTERLY: {
+    label: "Quarterly",
+    labelNo: "Kvartalsvis",
+    description: "Quarterly premium service",
+    typicalDuration: 60,
+  },
+  EMERGENCY: {
+    label: "Emergency",
+    labelNo: "Nødservice",
+    description: "Emergency repair visit",
+    typicalDuration: 180,
+  },
+  REPAIR: {
+    label: "Repair",
+    labelNo: "Reparasjon",
+    description: "Scheduled repair work",
+    typicalDuration: 150,
+  },
+  INSTALLATION: {
+    label: "Installation",
+    labelNo: "Installasjon",
+    description: "New system installation",
+    typicalDuration: 480,
+  },
 };
 
-export const visitStatusColors: Record<VisitStatus, string> = {
-  SCHEDULED: "info",
-  IN_PROGRESS: "warning",
-  COMPLETED: "success",
-  CANCELLED: "destructive",
-  RESCHEDULED: "secondary",
-};
-
-// Service Visit types
+// Service Visit interfaces
 export interface ServiceVisit {
   id: string;
   agreementId: string;
   technicianId: string;
-  visitNumber: number;
   scheduledDate: Date;
-  scheduledEnd?: Date | null;
-  actualStart?: Date | null;
-  actualEnd?: Date | null;
+  scheduledEndDate: Date | null;
+  actualStartDate: Date | null;
+  actualEndDate: Date | null;
   status: VisitStatus;
   visitType: VisitType;
-  durationMin?: number | null;
-  travelTimeMin?: number | null;
-  notes?: string | null;
-  technicianNotes?: string | null;
-  customerSign?: string | null;
-  customerSignAt?: Date | null;
-  completedAt?: Date | null;
+  durationMinutes: number | null;
+  notes: string | null;
+  customerNotes: string | null;
+  customerSignature: string | null;
+  signedAt: Date | null;
+  travelTimeMinutes: number | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface ServiceVisitWithRelations extends ServiceVisit {
-  agreement: ServiceAgreement & {
-    installation: Installation & {
+  agreement: {
+    id: string;
+    agreementNumber: string;
+    agreementType: string;
+    installation: {
+      id: string;
+      address: string;
+      city: string | null;
+      systemType: string;
+      capacityKw: Decimal;
       customer: {
-        tripletexId: string;
+        id: string;
         name: string;
-        email?: string | null;
-        phone?: string | null;
-        address?: string | null;
+        email: string | null;
+        phone: string | null;
       };
     };
   };
-  checklists: Checklist[];
+  checklists: Array<{
+    id: string;
+    status: string;
+    template: {
+      name: string;
+    };
+  }>;
+  photos: Array<{
+    id: string;
+    url: string;
+    caption: string | null;
+    category: string | null;
+  }>;
+  _count?: {
+    checklists: number;
+    photos: number;
+  };
 }
 
-// Technician type (from @energismart/shared)
+// Technician info (from @energismart/shared)
 export interface Technician {
   id: string;
   name: string;
   email: string;
-  phone?: string;
-  certifications?: string[];
-  skills?: string[];
-  homeLocation?: {
+  phone: string | null;
+  certifications: string[];
+  skills: string[];
+  homeLocation: {
     latitude: number;
     longitude: number;
-  };
-  isAvailable: boolean;
+  } | null;
+  calendarId: string | null;
 }
 
-// Form/input types
+// Create/Update DTOs
 export interface CreateVisitInput {
   agreementId: string;
   technicianId: string;
   scheduledDate: Date;
-  scheduledEnd?: Date;
+  scheduledEndDate?: Date;
   visitType: VisitType;
   notes?: string;
 }
 
-export interface UpdateVisitInput extends Partial<CreateVisitInput> {
-  id: string;
+export interface UpdateVisitInput {
+  technicianId?: string;
+  scheduledDate?: Date;
+  scheduledEndDate?: Date;
   status?: VisitStatus;
-  actualStart?: Date;
-  actualEnd?: Date;
-  technicianNotes?: string;
-  customerSign?: string;
+  visitType?: VisitType;
+  notes?: string;
 }
 
-export interface RescheduleVisitInput {
-  id: string;
-  newDate: Date;
-  newEnd?: Date;
-  reason?: string;
-  notifyCustomer?: boolean;
+export interface StartVisitInput {
+  visitId: string;
+  actualStartDate?: Date;
 }
 
-// Filter types
-export interface VisitFilters {
+export interface CompleteVisitInput {
+  visitId: string;
+  actualEndDate?: Date;
+  durationMinutes?: number;
+  customerSignature?: string;
+  customerNotes?: string;
+}
+
+// Filter/Search
+export interface VisitFilter {
+  technicianId?: string;
   status?: VisitStatus | VisitStatus[];
   visitType?: VisitType | VisitType[];
-  technicianId?: string;
-  agreementId?: string;
-  customerId?: string;
   dateFrom?: Date;
   dateTo?: Date;
-  search?: string;
+  customerId?: string;
+  installationId?: string;
 }
 
-// Calendar/planning types
-export interface CalendarEvent {
+// Calendar view
+export interface CalendarVisit {
   id: string;
   title: string;
   start: Date;
   end: Date;
   status: VisitStatus;
-  visitType: VisitType;
   technicianId: string;
   technicianName: string;
   customerName: string;
   address: string;
-  agreementId: string;
-}
-
-export interface TechnicianSchedule {
-  technician: Technician;
-  visits: ServiceVisit[];
-  availableSlots: Array<{
-    start: Date;
-    end: Date;
-  }>;
-  utilizationPercent: number;
-}
-
-// Helper functions
-export function getVisitDuration(visit: ServiceVisit): number {
-  if (visit.durationMin) return visit.durationMin;
-  if (visit.actualStart && visit.actualEnd) {
-    return Math.round(
-      (new Date(visit.actualEnd).getTime() - new Date(visit.actualStart).getTime()) / 60000
-    );
-  }
-  if (visit.scheduledDate && visit.scheduledEnd) {
-    return Math.round(
-      (new Date(visit.scheduledEnd).getTime() - new Date(visit.scheduledDate).getTime()) / 60000
-    );
-  }
-  return 90; // default 90 minutes
-}
-
-export function formatDuration(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  if (hours === 0) return `${mins} min`;
-  if (mins === 0) return `${hours} t`;
-  return `${hours} t ${mins} min`;
-}
-
-export function isVisitToday(visit: ServiceVisit): boolean {
-  const today = new Date();
-  const visitDate = new Date(visit.scheduledDate);
-  return (
-    visitDate.getFullYear() === today.getFullYear() &&
-    visitDate.getMonth() === today.getMonth() &&
-    visitDate.getDate() === today.getDate()
-  );
-}
-
-export function isVisitOverdue(visit: ServiceVisit): boolean {
-  if (visit.status === "COMPLETED" || visit.status === "CANCELLED") return false;
-  return new Date(visit.scheduledDate) < new Date();
-}
-
-export function visitToCalendarEvent(
-  visit: ServiceVisitWithRelations,
-  technicianName: string
-): CalendarEvent {
-  const installation = visit.agreement.installation;
-  return {
-    id: visit.id,
-    title: `${installation.customer.name} - ${visitTypeLabels[visit.visitType]}`,
-    start: new Date(visit.scheduledDate),
-    end: visit.scheduledEnd 
-      ? new Date(visit.scheduledEnd) 
-      : new Date(new Date(visit.scheduledDate).getTime() + 90 * 60000),
-    status: visit.status,
-    visitType: visit.visitType,
-    technicianId: visit.technicianId,
-    technicianName,
-    customerName: installation.customer.name,
-    address: `${installation.address}, ${installation.city ?? ""}`,
-    agreementId: visit.agreementId,
-  };
+  visitType: VisitType;
 }

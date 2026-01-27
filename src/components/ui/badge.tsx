@@ -1,5 +1,6 @@
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
+
 import { cn } from "~/lib/utils";
 
 const badgeVariants = cva(
@@ -13,25 +14,25 @@ const badgeVariants = cva(
           "border-transparent bg-secondary text-secondary-foreground",
         destructive:
           "border-transparent bg-destructive text-white",
-        outline: "text-foreground",
-        // Status variants for service management
+        outline: 
+          "text-foreground",
         success:
-          "border-transparent bg-success/15 text-success dark:bg-success/20",
+          "border-transparent bg-success text-success-foreground",
         warning:
-          "border-transparent bg-warning/15 text-warning dark:bg-warning/20",
+          "border-transparent bg-warning text-warning-foreground",
         info:
-          "border-transparent bg-info/15 text-info dark:bg-info/20",
-        // Service-specific status badges
+          "border-transparent bg-info text-info-foreground",
+        // Status variants for service visits
         scheduled:
-          "border-transparent bg-info/15 text-info dark:bg-info/20",
-        inProgress:
-          "border-transparent bg-warning/15 text-warning dark:bg-warning/20",
+          "border-info/30 bg-info/10 text-info dark:border-info/50 dark:bg-info/20",
+        "in-progress":
+          "border-warning/30 bg-warning/10 text-warning dark:border-warning/50 dark:bg-warning/20",
         completed:
-          "border-transparent bg-success/15 text-success dark:bg-success/20",
+          "border-success/30 bg-success/10 text-success dark:border-success/50 dark:bg-success/20",
         blocked:
-          "border-transparent bg-destructive/15 text-destructive dark:bg-destructive/20",
-        pending:
-          "border-transparent bg-muted text-muted-foreground",
+          "border-destructive/30 bg-destructive/10 text-destructive dark:border-destructive/50 dark:bg-destructive/20",
+        cancelled:
+          "border-muted-foreground/30 bg-muted text-muted-foreground",
       },
     },
     defaultVariants: {
@@ -51,43 +52,27 @@ function Badge({ className, variant, ...props }: BadgeProps) {
 }
 
 // Status badge with dot indicator
-interface StatusBadgeProps extends Omit<BadgeProps, "variant"> {
-  status: "scheduled" | "inProgress" | "completed" | "blocked" | "pending";
+interface StatusBadgeProps extends BadgeProps {
   showDot?: boolean;
 }
 
-const statusLabels: Record<StatusBadgeProps["status"], string> = {
-  scheduled: "Planlagt",
-  inProgress: "Pågår",
-  completed: "Fullført",
-  blocked: "Blokkert",
-  pending: "Venter",
-};
+function StatusBadge({ className, variant, showDot = true, children, ...props }: StatusBadgeProps) {
+  const dotColors: Record<string, string> = {
+    scheduled: "bg-info",
+    "in-progress": "bg-warning",
+    completed: "bg-success",
+    blocked: "bg-destructive",
+    cancelled: "bg-muted-foreground",
+  };
 
-function StatusBadge({
-  status,
-  showDot = true,
-  className,
-  children,
-  ...props
-}: StatusBadgeProps) {
+  const dotColor = variant ? dotColors[variant] ?? "bg-primary" : "bg-primary";
+
   return (
-    <Badge variant={status} className={cn("gap-1.5", className)} {...props}>
-      {showDot && (
-        <span
-          className={cn(
-            "size-1.5 rounded-full",
-            status === "scheduled" && "bg-info",
-            status === "inProgress" && "bg-warning",
-            status === "completed" && "bg-success",
-            status === "blocked" && "bg-destructive",
-            status === "pending" && "bg-muted-foreground"
-          )}
-        />
-      )}
-      {children ?? statusLabels[status]}
-    </Badge>
+    <div className={cn(badgeVariants({ variant }), "gap-1.5", className)} {...props}>
+      {showDot && <span className={cn("size-1.5 rounded-full", dotColor)} />}
+      {children}
+    </div>
   );
 }
 
-export { Badge, badgeVariants, StatusBadge };
+export { Badge, StatusBadge, badgeVariants };

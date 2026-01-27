@@ -1,27 +1,26 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Bell, Menu, Clock, FileText, Download } from "lucide-react";
+import { Bell, Search, Clock, Menu } from "lucide-react";
 import { cn } from "~/lib/utils";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { ThemeSwitch } from "~/components/ThemeSwitch";
+import { ThemeToggle } from "~/components/ThemeSwitch";
 
 interface HeaderProps {
   title: string;
-  breadcrumb?: string[];
-  onMenuClick?: () => void;
+  breadcrumb?: string;
   className?: string;
+  onMenuClick?: () => void;
+  showMobileMenu?: boolean;
 }
 
 export function Header({
   title,
   breadcrumb,
-  onMenuClick,
   className,
+  onMenuClick,
+  showMobileMenu = false,
 }: HeaderProps) {
-  const [searchValue, setSearchValue] = useState("");
-
   return (
     <header
       className={cn(
@@ -29,91 +28,62 @@ export function Header({
         className
       )}
     >
-      {/* Left side - Menu button and title */}
+      {/* Left: Title and mobile menu */}
       <div className="flex items-center gap-4">
-        {/* Mobile menu button */}
-        <button
-          onClick={onMenuClick}
-          className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground lg:hidden"
-          aria-label="Toggle menu"
-        >
-          <Menu className="size-5" />
-        </button>
-
-        <div className="flex flex-col">
-          {breadcrumb && breadcrumb.length > 0 && (
-            <nav className="hidden text-xs text-muted-foreground sm:block">
-              {breadcrumb.map((item, index) => (
-                <span key={index}>
-                  {index > 0 && <span className="mx-1">/</span>}
-                  <span className="hover:text-foreground">{item}</span>
-                </span>
-              ))}
-            </nav>
+        {showMobileMenu && (
+          <button
+            onClick={onMenuClick}
+            className="flex size-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground lg:hidden"
+          >
+            <Menu className="size-5" />
+          </button>
+        )}
+        
+        <div>
+          {breadcrumb && (
+            <p className="text-xs text-muted-foreground">{breadcrumb}</p>
           )}
           <h1 className="text-lg font-semibold text-foreground">{title}</h1>
         </div>
       </div>
 
-      {/* Right side - Actions */}
-      <div className="flex items-center gap-2 sm:gap-4">
-        {/* Search */}
-        <div className="relative hidden sm:block">
+      {/* Right: Search, icons, user */}
+      <div className="flex items-center gap-2">
+        {/* Search - hidden on mobile */}
+        <div className="relative hidden md:block">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
             placeholder="Søk..."
-            value={searchValue}
-            onChange={(e) => setSearchValue(e.target.value)}
-            className="w-48 pl-9 lg:w-64"
+            className="h-9 w-64 pl-9"
           />
         </div>
 
         {/* Action buttons */}
-        <div className="hidden items-center gap-2 md:flex">
-          <Button variant="outline" size="sm">
-            <FileText className="size-4" />
-            <span className="hidden lg:inline">Generer rapport</span>
+        <div className="flex items-center gap-1">
+          {/* Mobile search toggle */}
+          <Button variant="ghost" size="icon" className="md:hidden">
+            <Search className="size-5" />
           </Button>
-          <Button variant="outline" size="sm">
-            <Download className="size-4" />
-            <span className="hidden lg:inline">Eksporter</span>
-          </Button>
-        </div>
-
-        {/* Icon buttons */}
-        <div className="flex items-center">
-          <button
-            className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
-            aria-label="Recent activity"
-          >
+          
+          {/* History */}
+          <Button variant="ghost" size="icon" className="hidden sm:flex">
             <Clock className="size-5" />
-          </button>
-          <button
-            className="relative rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground"
-            aria-label="Notifications"
-          >
+          </Button>
+          
+          {/* Notifications */}
+          <Button variant="ghost" size="icon" className="relative">
             <Bell className="size-5" />
             {/* Notification badge */}
-            <span className="absolute right-1.5 top-1.5 flex size-2">
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-75" />
-              <span className="relative inline-flex size-2 rounded-full bg-primary" />
-            </span>
-          </button>
-
-          {/* Theme switch */}
-          <ThemeSwitch />
-
+            <span className="absolute right-1.5 top-1.5 flex size-2 items-center justify-center rounded-full bg-destructive" />
+          </Button>
+          
+          {/* Theme toggle */}
+          <ThemeToggle />
+          
           {/* User avatar */}
-          <button
-            className="ml-2 flex items-center gap-2 rounded-lg p-1.5 hover:bg-accent"
-            aria-label="User menu"
-          >
-            <div className="size-8 rounded-full bg-primary/20">
-              <span className="flex size-full items-center justify-center text-sm font-medium text-primary">
-                MD
-              </span>
-            </div>
+          <button className="ml-2 flex size-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+            ML
           </button>
         </div>
       </div>

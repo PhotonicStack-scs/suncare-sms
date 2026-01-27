@@ -12,108 +12,75 @@ function Skeleton({
   );
 }
 
-function SkeletonText({
-  lines = 3,
-  className,
-}: {
-  lines?: number;
-  className?: string;
-}) {
-  return (
-    <div className={cn("space-y-2", className)}>
-      {Array.from({ length: lines }).map((_, i) => (
-        <Skeleton
-          key={i}
-          className={cn(
-            "h-4",
-            i === lines - 1 ? "w-4/5" : "w-full"
-          )}
-        />
-      ))}
-    </div>
-  );
-}
-
+// Pre-built skeleton patterns
 function SkeletonCard({ className }: { className?: string }) {
   return (
-    <div
-      className={cn(
-        "rounded-xl border border-border bg-card p-6 space-y-4",
-        className
-      )}
-    >
-      <div className="flex items-center gap-3">
-        <Skeleton className="size-10 rounded-full" />
-        <div className="space-y-2 flex-1">
-          <Skeleton className="h-4 w-1/3" />
-          <Skeleton className="h-3 w-1/2" />
-        </div>
+    <div className={cn("rounded-xl border bg-card p-6", className)}>
+      <div className="space-y-3">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-8 w-32" />
+        <Skeleton className="h-3 w-20" />
       </div>
-      <SkeletonText lines={2} />
     </div>
   );
 }
 
-function SkeletonTable({
-  rows = 5,
-  columns = 4,
-  className,
-}: {
-  rows?: number;
-  columns?: number;
-  className?: string;
-}) {
+function SkeletonTableRow({ columns = 5 }: { columns?: number }) {
   return (
-    <div className={cn("space-y-3", className)}>
+    <tr className="border-b">
+      {Array.from({ length: columns }).map((_, i) => (
+        <td key={i} className="p-4">
+          <Skeleton className="h-4 w-full" />
+        </td>
+      ))}
+    </tr>
+  );
+}
+
+function SkeletonTable({ rows = 5, columns = 5 }: { rows?: number; columns?: number }) {
+  return (
+    <div className="rounded-xl border bg-card">
       {/* Header */}
-      <div className="flex gap-4 pb-2 border-b border-border">
-        {Array.from({ length: columns }).map((_, i) => (
+      <div className="border-b p-4">
+        <div className="flex gap-4">
+          {Array.from({ length: columns }).map((_, i) => (
+            <Skeleton key={i} className="h-4 flex-1" />
+          ))}
+        </div>
+      </div>
+      {/* Rows */}
+      <div className="divide-y">
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i} className="flex gap-4 p-4">
+            {Array.from({ length: columns }).map((_, j) => (
+              <Skeleton key={j} className="h-4 flex-1" />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SkeletonChart({ className }: { className?: string }) {
+  return (
+    <div className={cn("space-y-4", className)}>
+      <div className="flex items-end justify-between gap-2">
+        {Array.from({ length: 9 }).map((_, i) => (
           <Skeleton
             key={i}
-            className={cn(
-              "h-4",
-              i === 0 ? "w-24" : "flex-1"
-            )}
+            className="flex-1"
+            style={{ height: `${Math.random() * 100 + 40}px` }}
           />
         ))}
       </div>
-      {/* Rows */}
-      {Array.from({ length: rows }).map((_, rowIndex) => (
-        <div key={rowIndex} className="flex gap-4 py-2">
-          {Array.from({ length: columns }).map((_, colIndex) => (
-            <Skeleton
-              key={colIndex}
-              className={cn(
-                "h-4",
-                colIndex === 0 ? "w-24" : "flex-1"
-              )}
-            />
-          ))}
-        </div>
-      ))}
+      <div className="flex justify-between">
+        {Array.from({ length: 9 }).map((_, i) => (
+          <Skeleton key={i} className="h-3 w-8" />
+        ))}
+      </div>
     </div>
   );
 }
 
-function SkeletonKpiCard({ className }: { className?: string }) {
-  return (
-    <div
-      className={cn(
-        "rounded-xl border border-border bg-card p-6 space-y-3",
-        className
-      )}
-    >
-      <Skeleton className="h-4 w-1/2" />
-      <Skeleton className="h-8 w-3/4" />
-      <Skeleton className="h-3 w-1/3" />
-    </div>
-  );
-}
-
-export {
-  Skeleton,
-  SkeletonText,
-  SkeletonCard,
-  SkeletonTable,
-  SkeletonKpiCard,
-};
+export { Skeleton, SkeletonCard, SkeletonTableRow, SkeletonTable, SkeletonChart };

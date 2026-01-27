@@ -1,120 +1,118 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import {
-  getCachedCustomers,
-  getCustomerWithSync,
-  searchTripletexCustomers,
-  syncAllCustomers,
-  syncCustomer,
-} from "~/lib/tripletex";
+import { customerSyncService } from "~/server/services/customerSync";
 
-export const customerRouter = createTRPCRouter({
+export const customersRouter = createTRPCRouter({
   /**
-   * Get all cached customers with optional search/pagination
+   * Get all customers from local cache
    */
   getAll: protectedProcedure
     .input(
       z.object({
         search: z.string().optional(),
-        limit: z.number().min(1).max(100).default(50),
-        offset: z.number().min(0).default(0),
-      }).optional()
-    )
-    .query(async ({ input }) => {
-      return getCachedCustomers(input);
-    }),
-
-  /**
-   * Get a single customer by Tripletex ID
-   * Will sync from Tripletex if not found or stale
-   */
-  getById: protectedProcedure
-    .input(z.object({ tripletexId: z.string() }))
-    .query(async ({ input }) => {
-      return getCustomerWithSync(input.tripletexId);
-    }),
-
-  /**
-   * Search customers in Tripletex directly (for autocomplete)
-   */
-  searchTripletex: protectedProcedure
-    .input(
-      z.object({
-        query: z.string().min(2),
-        limit: z.number().min(1).max(50).default(20),
+        page: z.number().min(0).default(0),
+        limit: z.number().min(1).max(100).default(20),
       })
     )
+    .query(async ({ ctx, input }) => {
+      const { search, page, limit } = input;
+
+      const where = search
+        ? {
+            OR: [
+              { name: { contains: search, mode: "insensitive" as const } },
+              { email: { contains: search, mode: "insensitive" as const } },
+              { orgNumber: { contains: search, mode: "insensitive" as const } },
+            ],
+          }
+        : {};
+
+      const [customers, total] = await Promise.all([
+        ctx.db.customerCache.findMany({
+          where,
+          skip: page * limit,
+          take: limit,
+          orderBy: { name: "asc" },
+          include: {
+            _count: {
+              select: { installations: true },
+            },
+          },
+        }),
+        ctx.db.customerCache.count({ where }),
+      ]);
+
+      return {
+        items: customers,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        hasMore: (page + 1) * limit < total,
+      };
+    }),
+
+  /**
+   * Get a single customer by ID
+   */
+  getById: protectedProcedure
+    .input(z.string())
+    .query(async ({ ctx, input }) => {
+      const customer = await ctx.db.customerCache.findUnique({
+        where: { id: input },
+        include: {
+          installations: {
+            include: {
+              _count: {
+                select: { agreements: true },
+              },
+            },
+          },
+        },
+      });
+
+      if (!customer) {
+        throw new Error("Customer not found");
+      }
+
+      return customer;
+    }),
+
+  /**
+   * Get a customer by Tripletex ID (syncs if not found)
+   */
+  getByTripletexId: protectedProcedure
+    .input(z.number())
     .query(async ({ input }) => {
-      return searchTripletexCustomers(input.query, input.limit);
+      const customer = await customerSyncService.findOrSyncCustomer(input);
+      return customer;
+    }),
+
+  /**
+   * Search customers in Tripletex and sync results
+   */
+  searchInTripletex: protectedProcedure
+    .input(z.string().min(2))
+    .mutation(async ({ input }) => {
+      const customers = await customerSyncService.searchAndSync(input);
+      return customers;
     }),
 
   /**
    * Sync a single customer from Tripletex
    */
-  sync: protectedProcedure
-    .input(z.object({ tripletexId: z.number() }))
+  syncCustomer: protectedProcedure
+    .input(z.number())
     .mutation(async ({ input }) => {
-      await syncCustomer(input.tripletexId);
+      await customerSyncService.syncCustomer(input);
       return { success: true };
     }),
 
   /**
-   * Trigger full customer sync from Tripletex
-   * Should be used sparingly (e.g., admin action or cron job)
+   * Sync all customers from Tripletex (admin only)
    */
   syncAll: protectedProcedure.mutation(async () => {
-    return syncAllCustomers();
+    const result = await customerSyncService.syncAllCustomers();
+    return result;
   }),
-
-  /**
-   * Get customer's installations
-   */
-  getInstallations: protectedProcedure
-    .input(z.object({ customerId: z.string() }))
-    .query(async ({ ctx, input }) => {
-      return ctx.db.installation.findMany({
-        where: { customerId: input.customerId },
-        include: {
-          agreements: {
-            where: {
-              status: { in: ["ACTIVE", "PENDING_APPROVAL"] },
-            },
-            select: {
-              id: true,
-              agreementNumber: true,
-              agreementType: true,
-              status: true,
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      });
-    }),
-
-  /**
-   * Get customer's agreements
-   */
-  getAgreements: protectedProcedure
-    .input(z.object({ customerId: z.string() }))
-    .query(async ({ ctx, input }) => {
-      return ctx.db.serviceAgreement.findMany({
-        where: {
-          installation: {
-            customerId: input.customerId,
-          },
-        },
-        include: {
-          installation: {
-            select: {
-              id: true,
-              name: true,
-              address: true,
-              city: true,
-              systemType: true,
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      });
-    }),
 });

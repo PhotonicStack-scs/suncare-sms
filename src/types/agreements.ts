@@ -1,214 +1,205 @@
-import type { Installation } from "./installations";
-import type { Money } from "./common";
+import type { Decimal } from "@prisma/client/runtime/library";
 
-// Enums matching Prisma
+// Agreement Types
 export type AgreementType = "BASIC" | "STANDARD" | "PREMIUM" | "ENTERPRISE";
-export type AgreementStatus = "DRAFT" | "PENDING_APPROVAL" | "ACTIVE" | "SUSPENDED" | "EXPIRED" | "CANCELLED";
+export type AgreementStatus = "DRAFT" | "ACTIVE" | "EXPIRED" | "CANCELLED" | "PENDING_RENEWAL";
 export type SlaLevel = "STANDARD" | "PRIORITY" | "CRITICAL";
 
-export const agreementTypeLabels: Record<AgreementType, string> = {
-  BASIC: "Basis",
-  STANDARD: "Standard",
-  PREMIUM: "Premium",
-  ENTERPRISE: "Enterprise",
+// Agreement type metadata
+export const AGREEMENT_TYPE_INFO: Record<AgreementType, {
+  label: string;
+  labelNo: string;
+  description: string;
+  defaultFrequency: number;
+  features: string[];
+}> = {
+  BASIC: {
+    label: "Basic",
+    labelNo: "Basis",
+    description: "Annual inspection",
+    defaultFrequency: 1,
+    features: ["Visual check", "Cleaning", "Report"],
+  },
+  STANDARD: {
+    label: "Standard",
+    labelNo: "Standard",
+    description: "Regular maintenance",
+    defaultFrequency: 2,
+    features: ["Basic features", "Performance analysis", "Minor adjustments"],
+  },
+  PREMIUM: {
+    label: "Premium",
+    labelNo: "Premium",
+    description: "Complete service program",
+    defaultFrequency: 4,
+    features: ["Standard features", "Priority response", "Spare parts"],
+  },
+  ENTERPRISE: {
+    label: "Enterprise",
+    labelNo: "Enterprise",
+    description: "Customized enterprise agreement",
+    defaultFrequency: 0, // Custom
+    features: ["Fully customized SLA"],
+  },
 };
 
-export const agreementTypeDescriptions: Record<AgreementType, string> = {
-  BASIC: "Årlig inspeksjon med visuell sjekk og rapport",
-  STANDARD: "Halvårlig vedlikehold med ytelsesanalyse",
-  PREMIUM: "Kvartalsvis service med prioritert respons",
-  ENTERPRISE: "Tilpasset avtale med full SLA",
+export const AGREEMENT_STATUS_INFO: Record<AgreementStatus, {
+  label: string;
+  labelNo: string;
+  color: "default" | "success" | "warning" | "destructive" | "info";
+}> = {
+  DRAFT: { label: "Draft", labelNo: "Utkast", color: "default" },
+  ACTIVE: { label: "Active", labelNo: "Aktiv", color: "success" },
+  EXPIRED: { label: "Expired", labelNo: "Utløpt", color: "destructive" },
+  CANCELLED: { label: "Cancelled", labelNo: "Kansellert", color: "destructive" },
+  PENDING_RENEWAL: { label: "Pending Renewal", labelNo: "Venter på fornyelse", color: "warning" },
+};
+
+// Convenience label lookups
+export const agreementTypeLabels: Record<AgreementType, string> = {
+  BASIC: AGREEMENT_TYPE_INFO.BASIC.label,
+  STANDARD: AGREEMENT_TYPE_INFO.STANDARD.label,
+  PREMIUM: AGREEMENT_TYPE_INFO.PREMIUM.label,
+  ENTERPRISE: AGREEMENT_TYPE_INFO.ENTERPRISE.label,
 };
 
 export const agreementStatusLabels: Record<AgreementStatus, string> = {
-  DRAFT: "Utkast",
-  PENDING_APPROVAL: "Venter godkjenning",
-  ACTIVE: "Aktiv",
-  SUSPENDED: "Suspendert",
-  EXPIRED: "Utløpt",
-  CANCELLED: "Kansellert",
+  DRAFT: AGREEMENT_STATUS_INFO.DRAFT.label,
+  ACTIVE: AGREEMENT_STATUS_INFO.ACTIVE.label,
+  EXPIRED: AGREEMENT_STATUS_INFO.EXPIRED.label,
+  CANCELLED: AGREEMENT_STATUS_INFO.CANCELLED.label,
+  PENDING_RENEWAL: AGREEMENT_STATUS_INFO.PENDING_RENEWAL.label,
 };
 
-export const slaLevelLabels: Record<SlaLevel, string> = {
-  STANDARD: "Standard (5 dager)",
-  PRIORITY: "Prioritert (48 timer)",
-  CRITICAL: "Kritisk (24 timer)",
+export const SLA_LEVEL_INFO: Record<SlaLevel, {
+  label: string;
+  labelNo: string;
+  responseTime: string;
+  description: string;
+}> = {
+  STANDARD: {
+    label: "Standard",
+    labelNo: "Standard",
+    responseTime: "5 business days",
+    description: "Normal response time",
+  },
+  PRIORITY: {
+    label: "Priority",
+    labelNo: "Prioritet",
+    responseTime: "24 hours",
+    description: "Fast response for important issues",
+  },
+  CRITICAL: {
+    label: "Critical",
+    labelNo: "Kritisk",
+    responseTime: "4 hours",
+    description: "Immediate response for critical issues",
+  },
 };
 
-// Service Agreement types
+// Service Agreement interfaces
 export interface ServiceAgreement {
   id: string;
   installationId: string;
   agreementNumber: string;
   agreementType: AgreementType;
   status: AgreementStatus;
-  slaLevel: SlaLevel;
   startDate: Date;
-  endDate?: Date | null;
-  basePrice: number;
-  calculatedPrice?: number | null;
-  discountPercent?: number | null;
+  endDate: Date | null;
+  basePrice: Decimal;
+  slaLevel: SlaLevel;
   autoRenew: boolean;
   visitFrequency: number;
-  preferredVisitDay?: string | null;
-  preferredTimeSlot?: string | null;
-  notes?: string | null;
-  signedAt?: Date | null;
-  signedBy?: string | null;
-  cancelledAt?: Date | null;
-  cancellationReason?: string | null;
+  notes: string | null;
+  signedAt: Date | null;
+  signedBy: string | null;
+  tripletexProjectId: number | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface ServiceAgreementWithRelations extends ServiceAgreement {
-  installation: Installation & {
+  installation: {
+    id: string;
+    address: string;
+    city: string | null;
+    systemType: string;
+    capacityKw: Decimal;
     customer: {
-      tripletexId: string;
+      id: string;
       name: string;
-      email?: string | null;
-      phone?: string | null;
+      email: string | null;
+      phone: string | null;
     };
   };
-  addons: AgreementAddon[];
+  addons: Array<{
+    id: string;
+    quantity: number;
+    customPrice: Decimal | null;
+    addon: {
+      id: string;
+      name: string;
+      basePrice: Decimal;
+      category: string;
+    };
+  }>;
   _count?: {
     visits: number;
-    invoices: number;
   };
 }
 
-// Addon types
-export type AddonCategory = "MAINTENANCE" | "MONITORING" | "PRIORITY" | "EQUIPMENT";
-export type AddonFrequency = "ONE_TIME" | "PER_VISIT" | "MONTHLY" | "ANNUAL";
-
-export const addonCategoryLabels: Record<AddonCategory, string> = {
-  MAINTENANCE: "Vedlikehold",
-  MONITORING: "Overvåking",
-  PRIORITY: "Prioritet",
-  EQUIPMENT: "Utstyr",
-};
-
-export const addonFrequencyLabels: Record<AddonFrequency, string> = {
-  ONE_TIME: "Engangskjøp",
-  PER_VISIT: "Per besøk",
-  MONTHLY: "Månedlig",
-  ANNUAL: "Årlig",
-};
-
-export interface AddonProduct {
-  id: string;
-  name: string;
-  description?: string | null;
-  category: AddonCategory;
-  frequency: AddonFrequency;
-  basePrice: number;
-  unit?: string | null;
-  tripletexProductId?: string | null;
-  isActive: boolean;
-  sortOrder: number;
-}
-
-export interface AgreementAddon {
-  id: string;
-  agreementId: string;
-  addonId: string;
-  quantity: number;
-  customPrice?: number | null;
-  notes?: string | null;
-  addon: AddonProduct;
-}
-
-// Form/input types
+// Create/Update DTOs
 export interface CreateAgreementInput {
   installationId: string;
   agreementType: AgreementType;
-  slaLevel?: SlaLevel;
   startDate: Date;
   endDate?: Date;
   basePrice: number;
-  discountPercent?: number;
+  slaLevel: SlaLevel;
   autoRenew?: boolean;
   visitFrequency?: number;
-  preferredVisitDay?: string;
-  preferredTimeSlot?: string;
   notes?: string;
   addons?: Array<{
     addonId: string;
-    quantity: number;
+    quantity?: number;
     customPrice?: number;
-    notes?: string;
   }>;
 }
 
-export interface UpdateAgreementInput extends Partial<CreateAgreementInput> {
-  id: string;
-}
-
-// Filter types
-export interface AgreementFilters {
-  status?: AgreementStatus | AgreementStatus[];
-  agreementType?: AgreementType | AgreementType[];
-  customerId?: string;
-  installationId?: string;
+export interface UpdateAgreementInput {
+  agreementType?: AgreementType;
+  status?: AgreementStatus;
+  startDate?: Date;
+  endDate?: Date | null;
+  basePrice?: number;
   slaLevel?: SlaLevel;
-  startDateFrom?: Date;
-  startDateTo?: Date;
-  expiringWithinDays?: number;
-  search?: string;
+  autoRenew?: boolean;
+  visitFrequency?: number;
+  notes?: string | null;
 }
 
-// Price calculation types
-export interface PriceCalculation {
+// Price calculation
+export interface PriceCalculationInput {
+  agreementType: AgreementType;
+  slaLevel: SlaLevel;
+  capacityKw: number;
+  systemType: string;
+  addons?: Array<{ addonId: string; quantity: number }>;
+}
+
+export interface PriceCalculationResult {
   basePrice: number;
+  slaMultiplier: number;
+  capacityCharge: number;
   addonsTotal: number;
   subtotal: number;
-  discountAmount: number;
-  total: number;
   vatAmount: number;
-  grandTotal: number;
+  total: number;
   breakdown: Array<{
-    description: string;
-    quantity: number;
-    unitPrice: number;
-    total: number;
+    item: string;
+    amount: number;
   }>;
 }
 
-// Helper functions
-export function getVisitFrequencyLabel(frequency: number): string {
-  switch (frequency) {
-    case 1:
-      return "Årlig (1x/år)";
-    case 2:
-      return "Halvårlig (2x/år)";
-    case 4:
-      return "Kvartalsvis (4x/år)";
-    default:
-      return `${frequency}x/år`;
-  }
-}
 
-export function isAgreementExpiring(agreement: ServiceAgreement, withinDays = 30): boolean {
-  if (!agreement.endDate) return false;
-  const daysUntilExpiry = Math.ceil(
-    (new Date(agreement.endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-  );
-  return daysUntilExpiry > 0 && daysUntilExpiry <= withinDays;
-}
 
-export function getAgreementStatusColor(status: AgreementStatus): string {
-  switch (status) {
-    case "ACTIVE":
-      return "success";
-    case "DRAFT":
-    case "PENDING_APPROVAL":
-      return "info";
-    case "SUSPENDED":
-    case "EXPIRED":
-      return "warning";
-    case "CANCELLED":
-      return "destructive";
-    default:
-      return "secondary";
-  }
-}

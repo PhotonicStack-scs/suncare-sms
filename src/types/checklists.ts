@@ -1,176 +1,175 @@
-// Enums matching Prisma
-export type ChecklistStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED";
-export type ChecklistItemStatus = "PENDING" | "OK" | "NOT_OK" | "NOT_APPLICABLE";
-export type FindingSeverity = "CRITICAL" | "SERIOUS" | "MODERATE" | "MINOR" | "INFO";
-export type ChecklistInputType = "YES_NO" | "NUMERIC" | "TEXT" | "CHOICE" | "IMAGE" | "SIGNATURE" | "GPS" | "TEMPERATURE";
+// Checklist Types
+export type ChecklistStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
+export type ChecklistItemStatus = "PENDING" | "PASSED" | "FAILED" | "NOT_APPLICABLE";
+export type ItemSeverity = "CRITICAL" | "SERIOUS" | "MODERATE" | "MINOR";
+export type InputType = 
+  | "YES_NO"
+  | "YES_NO_NA"
+  | "NUMERIC"
+  | "TEXT"
+  | "MULTIPLE_CHOICE"
+  | "IMAGE"
+  | "SIGNATURE"
+  | "GPS"
+  | "TEMPERATURE"
+  | "ELECTRICAL_MEASUREMENT";
 
-export const checklistStatusLabels: Record<ChecklistStatus, string> = {
-  PENDING: "Ikke startet",
-  IN_PROGRESS: "Pågår",
-  COMPLETED: "Fullført",
+export const CHECKLIST_STATUS_INFO: Record<ChecklistStatus, {
+  label: string;
+  labelNo: string;
+  color: "default" | "warning" | "success";
+}> = {
+  NOT_STARTED: { label: "Not Started", labelNo: "Ikke startet", color: "default" },
+  IN_PROGRESS: { label: "In Progress", labelNo: "Pågår", color: "warning" },
+  COMPLETED: { label: "Completed", labelNo: "Fullført", color: "success" },
 };
 
-export const checklistItemStatusLabels: Record<ChecklistItemStatus, string> = {
-  PENDING: "Venter",
-  OK: "OK",
-  NOT_OK: "Avvik",
-  NOT_APPLICABLE: "Ikke aktuelt",
+export const ITEM_SEVERITY_INFO: Record<ItemSeverity, {
+  label: string;
+  labelNo: string;
+  color: "destructive" | "warning" | "info" | "success";
+  action: string;
+}> = {
+  CRITICAL: {
+    label: "Critical",
+    labelNo: "Kritisk",
+    color: "destructive",
+    action: "Immediate follow-up required",
+  },
+  SERIOUS: {
+    label: "Serious",
+    labelNo: "Alvorlig",
+    color: "warning",
+    action: "Schedule repair within 30 days",
+  },
+  MODERATE: {
+    label: "Moderate",
+    labelNo: "Moderat",
+    color: "info",
+    action: "Include in next service",
+  },
+  MINOR: {
+    label: "Minor",
+    labelNo: "Mindre",
+    color: "success",
+    action: "Information only",
+  },
 };
 
-export const findingSeverityLabels: Record<FindingSeverity, string> = {
-  CRITICAL: "Kritisk",
-  SERIOUS: "Alvorlig",
-  MODERATE: "Moderat",
-  MINOR: "Mindre",
-  INFO: "Informasjon",
+export const INPUT_TYPE_INFO: Record<InputType, {
+  label: string;
+  component: string;
+}> = {
+  YES_NO: { label: "Yes/No", component: "toggle" },
+  YES_NO_NA: { label: "Yes/No/N/A", component: "radio" },
+  NUMERIC: { label: "Numeric", component: "number" },
+  TEXT: { label: "Text", component: "textarea" },
+  MULTIPLE_CHOICE: { label: "Multiple Choice", component: "select" },
+  IMAGE: { label: "Image", component: "camera" },
+  SIGNATURE: { label: "Signature", component: "signature" },
+  GPS: { label: "GPS Coordinates", component: "gps" },
+  TEMPERATURE: { label: "Temperature", component: "number" },
+  ELECTRICAL_MEASUREMENT: { label: "Electrical Measurement", component: "number" },
 };
 
-export const findingSeverityColors: Record<FindingSeverity, string> = {
-  CRITICAL: "destructive",
-  SERIOUS: "warning",
-  MODERATE: "warning",
-  MINOR: "info",
-  INFO: "secondary",
-};
-
-// Checklist Template types
-export interface ChecklistTemplateItem {
-  id: string;
-  templateId: string;
-  category: string;
-  sortOrder: number;
-  code: string;
-  description: string;
-  inputType: ChecklistInputType;
-  options?: string[] | null;
-  minValue?: number | null;
-  maxValue?: number | null;
-  unit?: string | null;
-  isMandatory: boolean;
-  photoRequired: boolean;
-  helpText?: string | null;
-  defaultSeverity?: FindingSeverity | null;
-}
-
+// Checklist Template interfaces
 export interface ChecklistTemplate {
   id: string;
   name: string;
-  description?: string | null;
+  description: string | null;
   systemType: string;
   visitType: string;
   version: number;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
-  items?: ChecklistTemplateItem[];
 }
 
-// Checklist types
-export interface ChecklistItem {
+export interface ChecklistTemplateItem {
   id: string;
-  checklistId: string;
-  templateItemId?: string | null;
+  templateId: string;
   category: string;
-  code: string;
   description: string;
-  inputType: ChecklistInputType;
-  status: ChecklistItemStatus;
-  value?: string | null;
-  numericValue?: number | null;
-  notes?: string | null;
-  severity?: FindingSeverity | null;
-  photoUrls?: string[] | null;
-  gpsLatitude?: number | null;
-  gpsLongitude?: number | null;
-  completedAt?: Date | null;
+  inputType: InputType;
+  isMandatory: boolean;
+  photoRequired: boolean;
+  minValue: number | null;
+  maxValue: number | null;
+  options: string | null; // JSON array for multiple choice
+  helpText: string | null;
+  sortOrder: number;
+  conditionalOn: string | null;
+  conditionalValue: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
+export interface ChecklistTemplateWithItems extends ChecklistTemplate {
+  items: ChecklistTemplateItem[];
+}
+
+// Active Checklist interfaces
 export interface Checklist {
   id: string;
   visitId: string;
   templateId: string;
   technicianId: string;
   status: ChecklistStatus;
-  startedAt?: Date | null;
-  completedAt?: Date | null;
-  aiSummary?: string | null;
-  aiGenerated?: Date | null;
-  notes?: string | null;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  aiSummary: string | null;
   createdAt: Date;
   updatedAt: Date;
-  items?: ChecklistItem[];
-  template?: ChecklistTemplate;
 }
 
-// Form/input types
-export interface UpdateChecklistItemInput {
+export interface ChecklistItem {
   id: string;
+  checklistId: string;
+  category: string;
+  description: string;
+  inputType: InputType;
   status: ChecklistItemStatus;
-  value?: string;
-  numericValue?: number;
-  notes?: string;
-  severity?: FindingSeverity;
-  photoUrls?: string[];
-  gpsLatitude?: number;
-  gpsLongitude?: number;
+  value: string | null;
+  numericValue: number | null;
+  notes: string | null;
+  photoUrl: string | null;
+  severity: ItemSeverity | null;
+  completedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ChecklistWithItems extends Checklist {
+  items: ChecklistItem[];
+  template: ChecklistTemplate;
+}
+
+// Grouped items by category for UI
+export interface ChecklistCategoryGroup {
+  category: string;
+  items: ChecklistItem[];
+  completedCount: number;
+  totalCount: number;
+}
+
+// Update DTOs
+export interface UpdateChecklistItemInput {
+  status?: ChecklistItemStatus;
+  value?: string | null;
+  numericValue?: number | null;
+  notes?: string | null;
+  photoUrl?: string | null;
+  severity?: ItemSeverity | null;
 }
 
 export interface CompleteChecklistInput {
   checklistId: string;
-  items: UpdateChecklistItemInput[];
-  notes?: string;
-}
-
-// Checklist category grouping
-export interface ChecklistCategory {
-  name: string;
-  items: ChecklistItem[];
-  completedCount: number;
-  totalCount: number;
-  hasIssues: boolean;
-}
-
-// Helper functions
-export function groupChecklistItems(items: ChecklistItem[]): ChecklistCategory[] {
-  const categories = new Map<string, ChecklistItem[]>();
-  
-  for (const item of items) {
-    const existing = categories.get(item.category) ?? [];
-    existing.push(item);
-    categories.set(item.category, existing);
-  }
-  
-  return Array.from(categories.entries()).map(([name, categoryItems]) => ({
-    name,
-    items: categoryItems.sort((a, b) => a.code.localeCompare(b.code)),
-    completedCount: categoryItems.filter(i => i.status !== "PENDING").length,
-    totalCount: categoryItems.length,
-    hasIssues: categoryItems.some(i => i.status === "NOT_OK"),
-  }));
-}
-
-export function getChecklistProgress(checklist: Checklist): number {
-  if (!checklist.items || checklist.items.length === 0) return 0;
-  const completed = checklist.items.filter(i => i.status !== "PENDING").length;
-  return Math.round((completed / checklist.items.length) * 100);
-}
-
-export function countFindings(items: ChecklistItem[]): Record<FindingSeverity, number> {
-  const counts: Record<FindingSeverity, number> = {
-    CRITICAL: 0,
-    SERIOUS: 0,
-    MODERATE: 0,
-    MINOR: 0,
-    INFO: 0,
-  };
-  
-  for (const item of items) {
-    if (item.status === "NOT_OK" && item.severity) {
-      counts[item.severity]++;
-    }
-  }
-  
-  return counts;
+  items: Array<{
+    itemId: string;
+    status: ChecklistItemStatus;
+    value?: string;
+    numericValue?: number;
+    notes?: string;
+    severity?: ItemSeverity;
+  }>;
 }

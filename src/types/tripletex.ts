@@ -1,140 +1,230 @@
-// Tripletex API types
+// Tripletex API Response Types
+// Based on Tripletex API v2 documentation
 
+export interface TripletexResponse<T> {
+  value: T;
+}
+
+export interface TripletexListResponse<T> {
+  fullResultSize: number;
+  from: number;
+  count: number;
+  versionDigest: string;
+  values: T[];
+}
+
+// Customer types
 export interface TripletexCustomer {
   id: number;
+  version: number;
   name: string;
   organizationNumber?: string;
+  supplierNumber?: number;
+  customerNumber?: number;
+  isSupplier: boolean;
+  isCustomer: boolean;
+  isInactive: boolean;
   email?: string;
+  invoiceEmail?: string;
   phoneNumber?: string;
   phoneNumberMobile?: string;
-  invoiceEmail?: string;
+  description?: string;
+  language?: string;
+  accountManager?: TripletexEmployee;
   postalAddress?: TripletexAddress;
   physicalAddress?: TripletexAddress;
-  isCustomer: boolean;
-  isSupplier: boolean;
-  isInactive: boolean;
-  accountManager?: TripletexEmployee;
+  deliveryAddress?: TripletexAddress;
+  category1?: TripletexCategory;
+  category2?: TripletexCategory;
+  category3?: TripletexCategory;
 }
 
 export interface TripletexAddress {
+  id?: number;
   addressLine1?: string;
   addressLine2?: string;
   postalCode?: string;
   city?: string;
-  country?: {
-    id: number;
-    code: string;
-    name: string;
-  };
+  country?: TripletexCountry;
+}
+
+export interface TripletexCountry {
+  id: number;
+  name?: string;
+}
+
+export interface TripletexCategory {
+  id: number;
+  name?: string;
+  number?: string;
 }
 
 export interface TripletexEmployee {
   id: number;
-  firstName: string;
-  lastName: string;
+  firstName?: string;
+  lastName?: string;
   email?: string;
-  phoneNumberMobile?: string;
 }
 
+// Product types
 export interface TripletexProduct {
   id: number;
-  number?: string;
+  version: number;
   name: string;
+  number?: string;
   description?: string;
-  costExcludingVatCurrency?: number;
   priceExcludingVatCurrency?: number;
   priceIncludingVatCurrency?: number;
-  vatType?: {
-    id: number;
-    name: string;
-    percentage: number;
-  };
+  costExcludingVatCurrency?: number;
   isInactive: boolean;
-  productUnit?: {
-    id: number;
-    name: string;
-    shortName?: string;
-  };
+  productUnit?: TripletexProductUnit;
+  vatType?: TripletexVatType;
+  department?: TripletexDepartment;
+  account?: TripletexAccount;
 }
 
+export interface TripletexProductUnit {
+  id: number;
+  name?: string;
+  nameShort?: string;
+}
+
+export interface TripletexVatType {
+  id: number;
+  name?: string;
+  number?: string;
+  percentage?: number;
+}
+
+export interface TripletexDepartment {
+  id: number;
+  name?: string;
+  departmentNumber?: string;
+}
+
+export interface TripletexAccount {
+  id: number;
+  number: number;
+  name?: string;
+}
+
+// Invoice types
 export interface TripletexInvoice {
   id: number;
+  version: number;
   invoiceNumber?: number;
   invoiceDate: string;
-  customer: { id: number };
-  invoiceDueDate: string;
-  orders?: TripletexOrder[];
-  voucher?: {
-    id: number;
-  };
-  currency?: {
-    id: number;
-    code: string;
-  };
-  amountCurrency?: number;
-  amountExcludingVatCurrency?: number;
-  amountRoundoffCurrency?: number;
-  amountOutstandingCurrency?: number;
-  isCreditNote: boolean;
+  customer: TripletexCustomer;
+  dueDate: string;
   comment?: string;
-  isPaid: boolean;
+  orders?: TripletexOrder[];
+  projectInvoiceDetails?: TripletexProjectInvoiceDetails[];
+  voucher?: TripletexVoucher;
+  currency?: TripletexCurrency;
+  invoiceDueIn?: number;
+  invoiceDueInType?: string;
+  isCreditNote: boolean;
+  ehfSendStatus?: string;
 }
 
 export interface TripletexOrder {
   id: number;
-  number?: string;
-  customer: { id: number };
+  customer: TripletexCustomer;
   orderDate: string;
-  deliveryDate?: string;
   orderLines?: TripletexOrderLine[];
 }
 
 export interface TripletexOrderLine {
   id: number;
-  order: { id: number };
-  product?: { id: number };
-  description: string;
-  count: number;
+  version: number;
+  order?: TripletexOrder;
+  product?: TripletexProduct;
+  description?: string;
+  count?: number;
   unitCostCurrency?: number;
   unitPriceExcludingVatCurrency?: number;
+  unitPriceIncludingVatCurrency?: number;
+  vatType?: TripletexVatType;
   amountExcludingVatCurrency?: number;
   amountIncludingVatCurrency?: number;
-  vatType?: { id: number };
 }
 
-// API Response wrapper
-export interface TripletexListResponse<T> {
-  fullResultSize: number;
-  from: number;
-  count: number;
-  versionDigest?: string;
-  values: T[];
+export interface TripletexProjectInvoiceDetails {
+  id: number;
+  project?: TripletexProject;
 }
 
-export interface TripletexSingleResponse<T> {
-  value: T;
+export interface TripletexProject {
+  id: number;
+  name?: string;
+  number?: string;
+  description?: string;
+  projectManager?: TripletexEmployee;
+  customer?: TripletexCustomer;
 }
 
-// Create/Update types
-export interface CreateTripletexInvoice {
+export interface TripletexVoucher {
+  id: number;
+  number?: number;
+  date?: string;
+}
+
+export interface TripletexCurrency {
+  id: number;
+  code?: string;
+}
+
+// API Request types
+export interface TripletexCustomerSearchParams {
+  id?: string;
+  customerAccountNumber?: string;
+  organizationNumber?: string;
+  email?: string;
+  invoiceEmail?: string;
+  isInactive?: boolean;
+  isCustomer?: boolean;
+  from?: number;
+  count?: number;
+  sorting?: string;
+  fields?: string;
+}
+
+export interface TripletexInvoiceCreateRequest {
   invoiceDate: string;
-  invoiceDueDate: string;
-  customerId: number;
+  customer: { id: number };
   orders?: Array<{
-    orderId: number;
+    customer: { id: number };
+    orderDate: string;
+    orderLines: Array<{
+      product?: { id: number };
+      description: string;
+      count: number;
+      unitPriceExcludingVatCurrency: number;
+      vatType?: { id: number };
+    }>;
   }>;
   comment?: string;
+  invoiceDueIn?: number;
+  invoiceDueInType?: "DAYS" | "MONTHS" | "RECURRING_DAY_OF_MONTH";
 }
 
-export interface CreateTripletexOrderLine {
-  productId?: number;
-  description: string;
-  count: number;
-  unitPriceExcludingVatCurrency: number;
-  vatTypeId?: number;
+// Session token types
+export interface TripletexTokenResponse {
+  value: {
+    id: number;
+    version: number;
+    consumerToken: {
+      id: number;
+    };
+    employeeToken: {
+      id: number;
+    };
+    expirationDate: string;
+    token: string;
+  };
 }
 
-// Sync types
+// Sync result types
 export interface CustomerSyncResult {
   synced: number;
   created: number;
@@ -143,34 +233,4 @@ export interface CustomerSyncResult {
     tripletexId: number;
     error: string;
   }>;
-  lastSyncedAt: Date;
-}
-
-// Mapping helpers
-export function mapTripletexCustomerToCache(customer: TripletexCustomer) {
-  return {
-    tripletexId: String(customer.id),
-    name: customer.name,
-    orgNumber: customer.organizationNumber ?? null,
-    contactPerson: customer.accountManager 
-      ? `${customer.accountManager.firstName} ${customer.accountManager.lastName}`
-      : null,
-    email: customer.email ?? null,
-    phone: customer.phoneNumber ?? customer.phoneNumberMobile ?? null,
-    address: customer.physicalAddress?.addressLine1 ?? customer.postalAddress?.addressLine1 ?? null,
-    postalCode: customer.physicalAddress?.postalCode ?? customer.postalAddress?.postalCode ?? null,
-    city: customer.physicalAddress?.city ?? customer.postalAddress?.city ?? null,
-    invoiceEmail: customer.invoiceEmail ?? customer.email ?? null,
-  };
-}
-
-export function formatTripletexAddress(address?: TripletexAddress): string {
-  if (!address) return "";
-  const parts = [
-    address.addressLine1,
-    address.addressLine2,
-    [address.postalCode, address.city].filter(Boolean).join(" "),
-    address.country?.name,
-  ].filter(Boolean);
-  return parts.join(", ");
 }
