@@ -16,7 +16,7 @@ export const appRouter = createTRPCRouter({
   customers: customersRouter,
   agreements: agreementsRouter,
   installations: installationsRouter,
-  visits: visitsRouter,
+  visit: visitsRouter,
   checklists: checklistsRouter,
   invoices: invoicesRouter,
   reports: reportsRouter,
