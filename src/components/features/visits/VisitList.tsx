@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Search,
-  Filter,
   MoreHorizontal,
   Eye,
   Play,
@@ -13,7 +11,6 @@ import {
   Calendar,
   User,
 } from "lucide-react";
-import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import {
   Table,
@@ -34,7 +31,6 @@ import {
 import { api } from "~/trpc/react";
 import { formatDate } from "~/types/common";
 import { cn } from "~/lib/utils";
-import { SAMPLE_TECHNICIANS } from "~/data/sample-data";
 
 type VisitStatus = "SCHEDULED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED" | "BLOCKED";
 
@@ -61,7 +57,7 @@ interface VisitListProps {
   installationId?: string;
 }
 
-export function VisitList({ className, agreementId, installationId }: VisitListProps) {
+export function VisitList({ className, agreementId }: VisitListProps) {
   const router = useRouter();
   const [statusFilter, setStatusFilter] = useState<VisitStatus[]>([]);
 
@@ -71,19 +67,33 @@ export function VisitList({ className, agreementId, installationId }: VisitListP
     limit: 50,
   });
 
+  // Fetch technicians from @energismart/shared via dashboard router
+  const { data: technicians } = api.dashboard.getTechnicians.useQuery();
+
   const startVisit = api.visit.start.useMutation({
     onSuccess: () => {
-      // Refetch
+      // Refetch handled by React Query
     },
   });
 
   const completeVisit = api.visit.complete.useMutation({
     onSuccess: () => {
-      // Refetch
+      // Refetch handled by React Query
     },
   });
 
   const visits = data?.items ?? [];
+
+  // Create a map for quick technician lookup
+  const technicianMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (technicians) {
+      for (const tech of technicians) {
+        map.set(tech.id, tech.name);
+      }
+    }
+    return map;
+  }, [technicians]);
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
@@ -102,8 +112,7 @@ export function VisitList({ className, agreementId, installationId }: VisitListP
   };
 
   const getTechnicianName = (technicianId: string) => {
-    const tech = SAMPLE_TECHNICIANS.find((t) => t.id === technicianId);
-    return tech?.name ?? technicianId;
+    return technicianMap.get(technicianId) ?? "Ukjent tekniker";
   };
 
   const toggleStatusFilter = (status: VisitStatus) => {

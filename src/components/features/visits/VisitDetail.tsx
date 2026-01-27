@@ -2,12 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   Calendar,
   Clock,
   MapPin,
-  User,
   FileText,
   Play,
   CheckCircle,
@@ -15,7 +13,6 @@ import {
   AlertCircle,
   Loader2,
   ClipboardList,
-  Camera,
   Building2,
   Phone,
   Mail,
@@ -34,8 +31,6 @@ import {
 import { api } from "~/trpc/react";
 import { formatDate } from "~/types/common";
 import { VisitStatusFlow } from "./VisitStatusFlow";
-import { SAMPLE_TECHNICIANS } from "~/data/sample-data";
-import { cn } from "~/lib/utils";
 
 type VisitStatus = "SCHEDULED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED" | "BLOCKED";
 
@@ -61,10 +56,15 @@ interface VisitDetailProps {
 }
 
 export function VisitDetail({ visitId }: VisitDetailProps) {
-  const router = useRouter();
   const [showCancelDialog, setShowCancelDialog] = useState(false);
 
   const { data: visit, isLoading, refetch } = api.visit.getById.useQuery(visitId);
+  
+  // Fetch technician from @energismart/shared via dashboard router
+  const { data: technician } = api.dashboard.getTechnicianById.useQuery(
+    visit?.technicianId ?? "",
+    { enabled: !!visit?.technicianId }
+  );
 
   const startMutation = api.visit.start.useMutation({
     onSuccess: () => refetch(),
@@ -103,7 +103,6 @@ export function VisitDetail({ visitId }: VisitDetailProps) {
 
   const installation = visit.agreement.installation;
   const customer = installation.customer;
-  const technician = SAMPLE_TECHNICIANS.find((t) => t.id === visit.technicianId);
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
@@ -440,7 +439,7 @@ export function VisitDetail({ visitId }: VisitDetailProps) {
                       </a>
                     </div>
                   )}
-                  {technician.certifications && (
+                  {technician.certifications && technician.certifications.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
                       {technician.certifications.map((cert) => (
                         <span

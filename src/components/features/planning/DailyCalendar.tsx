@@ -1,15 +1,14 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { format, addDays, startOfWeek, endOfWeek, isToday } from "date-fns";
+import { format, addDays, startOfWeek, isToday } from "date-fns";
 import { nb } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, Calendar, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Card, CardContent } from "~/components/ui/card";
 import { api } from "~/trpc/react";
 import { TechnicianDayCard } from "./TechnicianDayCard";
 import { BookVisitDialog } from "./BookVisitDialog";
-import { SAMPLE_TECHNICIANS } from "~/data/sample-data";
 import { cn } from "~/lib/utils";
 
 interface DailyCalendarProps {
@@ -23,6 +22,9 @@ export function DailyCalendar({ initialDate = new Date() }: DailyCalendarProps) 
 
   const dateString = format(selectedDate, "yyyy-MM-dd");
 
+  // Fetch technicians from @energismart/shared via dashboard router
+  const { data: technicians, isLoading: loadingTechnicians } = api.dashboard.getTechnicians.useQuery();
+
   // Fetch visits for the selected date
   const {
     data: visitsData,
@@ -35,7 +37,7 @@ export function DailyCalendar({ initialDate = new Date() }: DailyCalendarProps) 
   });
 
   // Fetch visit stats
-  const { data: stats, isLoading: loadingStats } = api.visit.getStats.useQuery();
+  const { data: stats } = api.visit.getStats.useQuery();
 
   // Group visits by technician
   const visitsByTechnician = useMemo(() => {
@@ -43,9 +45,7 @@ export function DailyCalendar({ initialDate = new Date() }: DailyCalendarProps) 
     return visitsData.items.reduce(
       (acc, visit) => {
         const techId = visit.technicianId;
-        if (!acc[techId]) {
-          acc[techId] = [];
-        }
+        acc[techId] ??= [];
         acc[techId].push({
           id: visit.id,
           scheduledTime: format(new Date(visit.scheduledDate), "HH:mm"),
@@ -69,19 +69,26 @@ export function DailyCalendar({ initialDate = new Date() }: DailyCalendarProps) 
     );
   }, [visitsData]);
 
-  // Build technician schedule data
-  // In a real implementation, this would use @energismart/shared
+  // Build technician schedule data using real technicians from @energismart/shared
   const technicianSchedules = useMemo(() => {
-    return SAMPLE_TECHNICIANS.map((tech) => {
+    if (!technicians) return [];
+    
+    return technicians.map((tech) => {
       const techVisits = visitsByTechnician[tech.id] ?? [];
       const totalMinutes = techVisits.reduce((sum, v) => sum + v.estimatedDuration, 0);
       const totalHours = totalMinutes / 60;
       const utilization = Math.round((totalHours / 8) * 100);
 
       return {
-        technician: tech,
+        technician: {
+          id: tech.id,
+          name: tech.name,
+          email: tech.email,
+          phone: tech.phone,
+          certifications: tech.certifications,
+        },
         availability: {
-          available: true, // In real app, check via @energismart/shared
+          available: true, // In a full implementation, check via @energismart/shared availability API
           blockedBy: undefined,
           blockingDetails: undefined,
         },
@@ -91,7 +98,7 @@ export function DailyCalendar({ initialDate = new Date() }: DailyCalendarProps) 
         utilization: Math.min(utilization, 100),
       };
     });
-  }, [visitsByTechnician]);
+  }, [technicians, visitsByTechnician]);
 
   const handleBookVisit = (technicianId?: string) => {
     setSelectedTechnicianId(technicianId);
@@ -107,6 +114,8 @@ export function DailyCalendar({ initialDate = new Date() }: DailyCalendarProps) 
     const start = startOfWeek(selectedDate, { weekStartsOn: 1 });
     return Array.from({ length: 5 }, (_, i) => addDays(start, i));
   }, [selectedDate]);
+
+  const isLoading = loadingTechnicians || loadingVisits;
 
   return (
     <div className="space-y-6">
@@ -197,7 +206,7 @@ export function DailyCalendar({ initialDate = new Date() }: DailyCalendarProps) 
       </div>
 
       {/* Technician Schedule Grid */}
-      {loadingVisits ? (
+      {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="size-8 animate-spin text-muted-foreground" />
         </div>
@@ -219,7 +228,7 @@ export function DailyCalendar({ initialDate = new Date() }: DailyCalendarProps) 
       )}
 
       {/* Empty state */}
-      {!loadingVisits && technicianSchedules.length === 0 && (
+      {!isLoading && technicianSchedules.length === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Calendar className="size-12 text-muted-foreground mb-4" />
