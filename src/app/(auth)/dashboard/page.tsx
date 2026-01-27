@@ -1,37 +1,63 @@
-import { KpiRow, VisitsChart, RecentVisitsTable, AgreementPreview } from "~/components/features/dashboard";
-import { SAMPLE_KPIS, SAMPLE_MONTHLY_VISITS, SAMPLE_VISITS } from "~/data/sample-data";
+"use client";
 
-export const metadata = {
-  title: "Dashboard | Suncare",
-  description: "Oversikt over service management",
-};
+import { KpiRow, VisitsChart, RecentVisitsTable, AgreementPreview } from "~/components/features/dashboard";
+import { api } from "~/trpc/react";
+import { Loader2 } from "lucide-react";
 
 export default function DashboardPage() {
-  const kpis = [
-    {
-      title: "Planlagte besøk denne måneden",
-      ...SAMPLE_KPIS.scheduledVisits,
-    },
-    {
-      title: "Aktive avtaler",
-      ...SAMPLE_KPIS.activeAgreements,
-    },
-    {
-      title: "Fakturaer til godkjenning",
-      ...SAMPLE_KPIS.pendingInvoices,
-      format: "number" as const,
-    },
-  ];
+  const { data: kpiData, isLoading: kpiLoading } = api.dashboard.getKpis.useQuery();
+  const { data: monthlyVisits, isLoading: monthlyLoading } = api.dashboard.getMonthlyVisits.useQuery();
+  const { data: recentVisits, isLoading: visitsLoading } = api.dashboard.getRecentVisits.useQuery({ limit: 10 });
 
-  // Transform sample visits for the table
-  const tableVisits = SAMPLE_VISITS.map((visit) => ({
+  const isLoading = kpiLoading || monthlyLoading || visitsLoading;
+
+  const kpis = kpiData
+    ? [
+        {
+          title: "Planlagte besøk denne måneden",
+          value: kpiData.scheduledVisits.value,
+          previousValue: kpiData.scheduledVisits.previousValue,
+          change: kpiData.scheduledVisits.change,
+          changePercent: kpiData.scheduledVisits.changePercent,
+          trend: kpiData.scheduledVisits.trend as "up" | "down" | "stable",
+        },
+        {
+          title: "Aktive avtaler",
+          value: kpiData.activeAgreements.value,
+          previousValue: kpiData.activeAgreements.previousValue,
+          change: kpiData.activeAgreements.change,
+          changePercent: kpiData.activeAgreements.changePercent,
+          trend: kpiData.activeAgreements.trend as "up" | "down" | "stable",
+        },
+        {
+          title: "Fakturaer til godkjenning",
+          value: kpiData.pendingInvoices.value,
+          previousValue: kpiData.pendingInvoices.previousValue,
+          change: kpiData.pendingInvoices.change,
+          changePercent: kpiData.pendingInvoices.changePercent,
+          trend: kpiData.pendingInvoices.trend as "up" | "down" | "stable",
+          format: "number" as const,
+        },
+      ]
+    : [];
+
+  const tableVisits = recentVisits?.map((visit) => ({
     id: visit.id,
     customerName: visit.customerName,
     address: visit.address,
     visitType: visit.visitType,
     scheduledDate: visit.scheduledDate,
     status: visit.status,
-  }));
+    technicianName: visit.technicianName,
+  })) ?? [];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -53,8 +79,8 @@ export default function DashboardPage() {
         {/* Right: Chart */}
         <div className="lg:col-span-2">
           <VisitsChart
-            data={SAMPLE_MONTHLY_VISITS}
-            highlightMonth={8} // September (current)
+            data={monthlyVisits ?? []}
+            highlightMonth={monthlyVisits ? monthlyVisits.length - 1 : 0}
           />
         </div>
       </div>
