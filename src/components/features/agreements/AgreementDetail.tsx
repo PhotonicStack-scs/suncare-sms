@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   Calendar,
   Edit,
@@ -45,7 +44,6 @@ import {
   AGREEMENT_STATUS_INFO,
   SLA_LEVEL_INFO,
   type AgreementStatus,
-  type ServiceAgreementWithRelations,
 } from "~/types/agreements";
 import { formatMoney, formatDate } from "~/types/common";
 import { cn } from "~/lib/utils";
@@ -55,7 +53,6 @@ interface AgreementDetailProps {
 }
 
 export function AgreementDetail({ agreementId }: AgreementDetailProps) {
-  const router = useRouter();
   const [showActivateDialog, setShowActivateDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
 
@@ -67,14 +64,14 @@ export function AgreementDetail({ agreementId }: AgreementDetailProps) {
 
   const activateMutation = api.agreements.activate.useMutation({
     onSuccess: () => {
-      refetch();
+      void refetch();
       setShowActivateDialog(false);
     },
   });
 
   const cancelMutation = api.agreements.cancel.useMutation({
     onSuccess: () => {
-      refetch();
+      void refetch();
       setShowCancelDialog(false);
     },
   });
@@ -101,13 +98,13 @@ export function AgreementDetail({ agreementId }: AgreementDetailProps) {
 
   const statusMap: Record<
     AgreementStatus,
-    "scheduled" | "inProgress" | "completed" | "blocked" | "pending"
+    "scheduled" | "in-progress" | "completed" | "blocked" | "cancelled"
   > = {
-    DRAFT: "pending",
-    PENDING_RENEWAL: "pending",
+    DRAFT: "scheduled",
+    PENDING_RENEWAL: "in-progress",
     ACTIVE: "completed",
     EXPIRED: "blocked",
-    CANCELLED: "blocked",
+    CANCELLED: "cancelled",
   };
 
   const installation = agreement.installation;
@@ -129,7 +126,7 @@ export function AgreementDetail({ agreementId }: AgreementDetailProps) {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">{agreement.agreementNumber}</h1>
-            <StatusBadge status={statusMap[agreement.status]}>
+            <StatusBadge variant={statusMap[agreement.status]}>
               {statusInfo.labelNo}
             </StatusBadge>
           </div>
@@ -388,12 +385,12 @@ export function AgreementDetail({ agreementId }: AgreementDetailProps) {
                           </div>
                         </div>
                         <StatusBadge
-                          status={
+                          variant={
                             visit.status === "COMPLETED"
                               ? "completed"
                               : visit.status === "SCHEDULED"
                                 ? "scheduled"
-                                : "pending"
+                                : "in-progress"
                           }
                         >
                           {visit.status}

@@ -67,7 +67,7 @@ export default function EditAgreementPage({ params }: EditAgreementPageProps) {
       ...formData,
       startDate: formData.startDate ? new Date(formData.startDate) : undefined,
       endDate: formData.endDate ? new Date(formData.endDate) : null,
-      notes: formData.notes || null,
+      notes: formData.notes ?? null,
     });
   };
 

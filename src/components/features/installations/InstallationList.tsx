@@ -158,8 +158,8 @@ export function InstallationList({ className }: InstallationListProps) {
                   </TableCell>
                   <TableCell>
                     <StatusBadge
-                      status={
-                        installation._count.agreements > 0 ? "completed" : "pending"
+                      variant={
+                        installation._count.agreements > 0 ? "completed" : "scheduled"
                       }
                     >
                       {installation._count.agreements > 0

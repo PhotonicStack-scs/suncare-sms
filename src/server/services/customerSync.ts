@@ -160,7 +160,7 @@ export const customerSyncService = {
   /**
    * Search customers in Tripletex and sync results to local cache
    */
-  async searchAndSync(query: string): Promise<typeof db.customerCache.findMany> {
+  async searchAndSync(query: string) {
     // Search in Tripletex
     const tripletexResults = await tripletexCustomers.search({
       customerAccountNumber: query,

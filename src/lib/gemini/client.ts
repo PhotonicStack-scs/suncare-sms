@@ -162,7 +162,7 @@ class GeminiClient {
         .trim();
       
       return JSON.parse(cleaned) as T;
-    } catch (error) {
+    } catch {
       throw new Error(`Failed to parse JSON response: ${response}`);
     }
   }

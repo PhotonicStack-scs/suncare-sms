@@ -141,7 +141,6 @@ export const invoicesRouter = createTRPCRouter({
       // Calculate totals
       const lineItems = lines.map((line) => {
         const totalPrice = line.quantity * line.unitPrice;
-        const vatAmount = totalPrice * (line.vatRate / 100);
         return {
           description: line.description,
           quantity: line.quantity,

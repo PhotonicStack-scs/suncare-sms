@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Calendar,
   Clock,
@@ -76,7 +77,7 @@ export function VisitDetail({ visitId }: VisitDetailProps) {
 
   const cancelMutation = api.visit.cancel.useMutation({
     onSuccess: () => {
-      refetch();
+      void refetch();
       setShowCancelDialog(false);
     },
   });
@@ -109,14 +110,15 @@ export function VisitDetail({ visitId }: VisitDetailProps) {
       case "SCHEDULED":
         return "scheduled";
       case "IN_PROGRESS":
-        return "inProgress";
+        return "in-progress";
       case "COMPLETED":
         return "completed";
       case "CANCELLED":
+        return "cancelled";
       case "BLOCKED":
         return "blocked";
       default:
-        return "pending";
+        return "scheduled";
     }
   };
 
@@ -127,7 +129,7 @@ export function VisitDetail({ visitId }: VisitDetailProps) {
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold">{customer.name}</h1>
-            <StatusBadge status={getStatusBadgeVariant(visit.status)}>
+            <StatusBadge variant={getStatusBadgeVariant(visit.status)}>
               {STATUS_LABELS[visit.status as VisitStatus] ?? visit.status}
             </StatusBadge>
           </div>
@@ -352,12 +354,12 @@ export function VisitDetail({ visitId }: VisitDetailProps) {
                           </p>
                         </div>
                         <StatusBadge
-                          status={
+                          variant={
                             checklist.status === "COMPLETED"
                               ? "completed"
                               : checklist.status === "IN_PROGRESS"
-                                ? "inProgress"
-                                : "pending"
+                                ? "in-progress"
+                                : "scheduled"
                           }
                         >
                           {checklist.status === "COMPLETED"
@@ -389,12 +391,14 @@ export function VisitDetail({ visitId }: VisitDetailProps) {
                   {visit.photos.map((photo) => (
                     <div
                       key={photo.id}
-                      className="aspect-square rounded-lg bg-muted overflow-hidden"
+                      className="relative aspect-square rounded-lg bg-muted overflow-hidden"
                     >
-                      <img
+                      <Image
                         src={photo.url}
                         alt={photo.caption ?? "Besøksbilde"}
-                        className="w-full h-full object-cover"
+                        fill
+                        unoptimized
+                        className="object-cover"
                       />
                     </div>
                   ))}

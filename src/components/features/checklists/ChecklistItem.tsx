@@ -5,7 +5,6 @@ import {
   Check,
   X,
   Minus,
-  Camera,
   AlertTriangle,
   ChevronDown,
 } from "lucide-react";

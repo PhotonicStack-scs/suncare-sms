@@ -3,7 +3,6 @@
 import { ArrowUp, ArrowDown, Minus } from "lucide-react";
 import { Card, CardContent } from "~/components/ui/card";
 import { cn } from "~/lib/utils";
-import type { KpiValue } from "~/types";
 
 interface KpiCardProps {
   title: string;
@@ -19,7 +18,6 @@ interface KpiCardProps {
 export function KpiCard({
   title,
   value,
-  previousValue,
   change,
   changePercent,
   trend,

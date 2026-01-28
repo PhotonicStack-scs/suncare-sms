@@ -165,6 +165,7 @@ model Installation {
     batteryKwh    Decimal?   @db.Decimal(10, 2)
     batteryType   String?
     monitoringId  String?
+    monitoringUrl String?
     notes         String?
     isActive      Boolean    @default(true)
     createdAt     DateTime   @default(now())

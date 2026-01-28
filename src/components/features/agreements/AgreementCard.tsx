@@ -6,7 +6,6 @@ import { StatusBadge } from "~/components/ui/badge";
 import { cn } from "~/lib/utils";
 import {
   agreementTypeLabels,
-  getAgreementStatusColor,
   type ServiceAgreementWithRelations,
 } from "~/types/agreements";
 import { formatMoney, formatDate } from "~/types/common";
@@ -26,13 +25,12 @@ export function AgreementCard({
   const installation = agreement.installation;
   const customer = installation.customer;
 
-  const statusMap: Record<string, "scheduled" | "inProgress" | "completed" | "blocked" | "pending"> = {
-    DRAFT: "pending",
-    PENDING_APPROVAL: "pending",
+  const statusMap: Record<string, "scheduled" | "in-progress" | "completed" | "blocked" | "cancelled"> = {
+    DRAFT: "scheduled",
     ACTIVE: "completed",
-    SUSPENDED: "blocked",
+    PENDING_RENEWAL: "in-progress",
     EXPIRED: "blocked",
-    CANCELLED: "blocked",
+    CANCELLED: "cancelled",
   };
 
   return (
@@ -53,12 +51,12 @@ export function AgreementCard({
               {agreement.agreementNumber}
             </p>
           </div>
-          <StatusBadge status={statusMap[agreement.status] ?? "pending"}>
+          <StatusBadge variant={statusMap[agreement.status] ?? "scheduled"}>
             {agreement.status === "ACTIVE" ? "Aktiv" : 
              agreement.status === "DRAFT" ? "Utkast" :
-             agreement.status === "PENDING_APPROVAL" ? "Venter" :
+             agreement.status === "PENDING_RENEWAL" ? "Fornyes" :
              agreement.status === "CANCELLED" ? "Kansellert" :
-             agreement.status === "EXPIRED" ? "Utløpt" : "Suspendert"}
+             "Utløpt"}
           </StatusBadge>
         </div>
       </CardHeader>
@@ -100,7 +98,7 @@ export function AgreementCard({
           </div>
           <span className="text-sm font-semibold">
             {formatMoney({
-              amount: Number(agreement.calculatedPrice ?? agreement.basePrice),
+              amount: Number(agreement.basePrice),
               currency: "NOK",
             })}
             <span className="font-normal text-muted-foreground">/år</span>
@@ -149,7 +147,7 @@ export function AgreementPreviewCard({
         <div>
           <p className="text-2xl font-bold">
             {formatMoney({
-              amount: Number(agreement.calculatedPrice ?? agreement.basePrice),
+              amount: Number(agreement.basePrice),
               currency: "NOK",
             })}
           </p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Wrench, Clock, AlertCircle, Building2, User } from "lucide-react";
+import { Wrench, Clock, AlertCircle, Building2 } from "lucide-react";
 import { Card } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
@@ -119,7 +119,7 @@ export function TechnicianDayCard({
 
         {/* Status */}
         {!availability.available && (
-          <StatusBadge status="blocked">{getBlockedLabel(availability.blockedBy)}</StatusBadge>
+          <StatusBadge variant="blocked">{getBlockedLabel(availability.blockedBy)}</StatusBadge>
         )}
       </div>
 
@@ -132,7 +132,7 @@ export function TechnicianDayCard({
             <span className="flex-1">
               Prosjekt: {projectAssignment.projectName} ({projectAssignment.hours} timer)
             </span>
-            <StatusBadge status="pending">Ressursplanlegger</StatusBadge>
+            <StatusBadge variant="scheduled">Ressursplanlegger</StatusBadge>
           </div>
         )}
 

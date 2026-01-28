@@ -155,6 +155,7 @@ exports.Prisma.InstallationScalarFieldEnum = {
   batteryKwh: 'batteryKwh',
   batteryType: 'batteryType',
   monitoringId: 'monitoringId',
+  monitoringUrl: 'monitoringUrl',
   notes: 'notes',
   isActive: 'isActive',
   createdAt: 'createdAt',

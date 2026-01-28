@@ -1,6 +1,6 @@
 import "~/styles/globals.css";
 
-import { type Metadata } from "next";
+import { type Metadata, type Viewport } from "next";
 import { Geist } from "next/font/google";
 
 import { TRPCReactProvider } from "~/trpc/react";
@@ -20,6 +20,9 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: true,
   },
+};
+
+export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#F7F8FB" },
     { media: "(prefers-color-scheme: dark)", color: "#0B0F14" },

@@ -86,7 +86,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   if (!mounted) {
     return (
       <ThemeContext.Provider
-        value={{ theme: "system", resolvedTheme: "light", setTheme: () => {} }}
+        value={{ theme: "system", resolvedTheme: "light", setTheme: () => { /* noop */ } }}
       >
         {children}
       </ThemeContext.Provider>

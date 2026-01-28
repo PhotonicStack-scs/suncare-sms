@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "~/lib/utils";
@@ -37,12 +38,13 @@ function Avatar({ className, size, ...props }: AvatarProps) {
   );
 }
 
-function AvatarImage({
-  className,
-  src,
-  alt,
-  ...props
-}: React.ImgHTMLAttributes<HTMLImageElement>) {
+interface AvatarImageProps {
+  className?: string;
+  src?: string;
+  alt?: string;
+}
+
+function AvatarImage({ className, src, alt }: AvatarImageProps) {
   const [hasError, setHasError] = React.useState(false);
 
   if (hasError || !src) {
@@ -50,13 +52,14 @@ function AvatarImage({
   }
 
   return (
-    <img
+    <Image
       data-slot="avatar-image"
       src={src}
-      alt={alt}
-      className={cn("aspect-square size-full object-cover", className)}
+      alt={alt ?? ""}
+      fill
+      unoptimized
+      className={cn("object-cover", className)}
       onError={() => setHasError(true)}
-      {...props}
     />
   );
 }

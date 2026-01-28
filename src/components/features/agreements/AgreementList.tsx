@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, Filter, Plus, MoreHorizontal, Eye, Edit, X } from "lucide-react";
+import { Search, Plus, MoreHorizontal, Eye, Edit, X } from "lucide-react";
 import { Input } from "~/components/ui/input";
 import { Button } from "~/components/ui/button";
 import {
@@ -26,7 +26,6 @@ import {
   agreementTypeLabels,
   agreementStatusLabels,
   type AgreementStatus,
-  type ServiceAgreementWithRelations,
 } from "~/types/agreements";
 import { formatMoney, formatDate } from "~/types/common";
 import { cn } from "~/lib/utils";
@@ -48,12 +47,12 @@ export function AgreementList({ className }: AgreementListProps) {
 
   const agreements = data?.items ?? [];
 
-  const statusMap: Record<AgreementStatus, "scheduled" | "inProgress" | "completed" | "blocked" | "pending"> = {
-    DRAFT: "pending",
-    PENDING_RENEWAL: "pending",
+  const statusMap: Record<AgreementStatus, "scheduled" | "in-progress" | "completed" | "blocked" | "cancelled"> = {
+    DRAFT: "scheduled",
+    PENDING_RENEWAL: "in-progress",
     ACTIVE: "completed",
     EXPIRED: "blocked",
-    CANCELLED: "blocked",
+    CANCELLED: "cancelled",
   };
 
   const toggleStatusFilter = (status: AgreementStatus) => {
@@ -173,12 +172,12 @@ export function AgreementList({ className }: AgreementListProps) {
                   <TableCell>{formatDate(agreement.startDate)}</TableCell>
                   <TableCell className="text-right font-medium">
                     {formatMoney({
-                      amount: Number(agreement.calculatedPrice ?? agreement.basePrice),
+                      amount: Number(agreement.basePrice),
                       currency: "NOK",
                     })}
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={statusMap[agreement.status]}>
+                    <StatusBadge variant={statusMap[agreement.status]}>
                       {agreementStatusLabels[agreement.status]}
                     </StatusBadge>
                   </TableCell>

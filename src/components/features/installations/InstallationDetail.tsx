@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   Edit,
   MapPin,
@@ -54,8 +53,6 @@ const SYSTEM_TYPE_INFO: Record<
 };
 
 export function InstallationDetail({ installationId }: InstallationDetailProps) {
-  const router = useRouter();
-
   const { data: installation, isLoading } =
     api.installations.getById.useQuery(installationId);
 
@@ -83,13 +80,13 @@ export function InstallationDetail({ installationId }: InstallationDetailProps) 
   const systemInfo = SYSTEM_TYPE_INFO[installation.systemType];
   const statusMap: Record<
     AgreementStatus,
-    "scheduled" | "inProgress" | "completed" | "blocked" | "pending"
+    "scheduled" | "in-progress" | "completed" | "blocked" | "cancelled"
   > = {
-    DRAFT: "pending",
-    PENDING_RENEWAL: "pending",
+    DRAFT: "scheduled",
+    PENDING_RENEWAL: "in-progress",
     ACTIVE: "completed",
     EXPIRED: "blocked",
-    CANCELLED: "blocked",
+    CANCELLED: "cancelled",
   };
 
   return (
@@ -292,7 +289,7 @@ export function InstallationDetail({ installationId }: InstallationDetailProps) 
                             <span className="font-medium text-sm">
                               {agreement.agreementNumber}
                             </span>
-                            <StatusBadge status={statusMap[agreement.status]}>
+                            <StatusBadge variant={statusMap[agreement.status]}>
                               {AGREEMENT_STATUS_INFO[agreement.status].labelNo}
                             </StatusBadge>
                           </div>

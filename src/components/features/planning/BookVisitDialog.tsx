@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Calendar, Clock, MapPin, User } from "lucide-react";
+import { Loader2, Calendar, Clock } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
@@ -62,7 +62,6 @@ export function BookVisitDialog({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const selectedType = VISIT_TYPES.find((t) => t.value === formData.visitType);
     const scheduledDateTime = new Date(
       `${formData.scheduledDate}T${formData.scheduledTime}:00`
     );

@@ -7,11 +7,11 @@ import { Header } from "./Header";
 
 interface AppShellProps {
   children: React.ReactNode;
-  title: string;
+  title?: string;
   breadcrumb?: string;
 }
 
-export function AppShell({ children, title, breadcrumb }: AppShellProps) {
+export function AppShell({ children, title = "", breadcrumb }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (

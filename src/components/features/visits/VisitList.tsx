@@ -100,14 +100,15 @@ export function VisitList({ className, agreementId }: VisitListProps) {
       case "SCHEDULED":
         return "scheduled";
       case "IN_PROGRESS":
-        return "inProgress";
+        return "in-progress";
       case "COMPLETED":
         return "completed";
       case "CANCELLED":
+        return "cancelled";
       case "BLOCKED":
         return "blocked";
       default:
-        return "pending";
+        return "scheduled";
     }
   };
 
@@ -212,7 +213,7 @@ export function VisitList({ className, agreementId }: VisitListProps) {
                     {formatDate(visit.scheduledDate)}
                   </TableCell>
                   <TableCell>
-                    <StatusBadge status={getStatusBadgeVariant(visit.status)}>
+                    <StatusBadge variant={getStatusBadgeVariant(visit.status)}>
                       {STATUS_LABELS[visit.status as VisitStatus] ?? visit.status}
                     </StatusBadge>
                   </TableCell>

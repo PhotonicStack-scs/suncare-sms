@@ -44,8 +44,8 @@ export const tripletexProducts = {
     return products.filter(
       (p) =>
         p.name.toLowerCase().includes(lowerQuery) ||
-        p.number?.toLowerCase().includes(lowerQuery) ||
-        p.description?.toLowerCase().includes(lowerQuery)
+        (p.number?.toLowerCase().includes(lowerQuery) ?? false) ||
+        (p.description?.toLowerCase().includes(lowerQuery) ?? false)
     );
   },
 };

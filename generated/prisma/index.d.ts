@@ -3869,6 +3869,7 @@ export namespace Prisma {
     batteryKwh: Decimal | null
     batteryType: string | null
     monitoringId: string | null
+    monitoringUrl: string | null
     notes: string | null
     isActive: boolean | null
     createdAt: Date | null
@@ -3893,6 +3894,7 @@ export namespace Prisma {
     batteryKwh: Decimal | null
     batteryType: string | null
     monitoringId: string | null
+    monitoringUrl: string | null
     notes: string | null
     isActive: boolean | null
     createdAt: Date | null
@@ -3917,6 +3919,7 @@ export namespace Prisma {
     batteryKwh: number
     batteryType: number
     monitoringId: number
+    monitoringUrl: number
     notes: number
     isActive: number
     createdAt: number
@@ -3959,6 +3962,7 @@ export namespace Prisma {
     batteryKwh?: true
     batteryType?: true
     monitoringId?: true
+    monitoringUrl?: true
     notes?: true
     isActive?: true
     createdAt?: true
@@ -3983,6 +3987,7 @@ export namespace Prisma {
     batteryKwh?: true
     batteryType?: true
     monitoringId?: true
+    monitoringUrl?: true
     notes?: true
     isActive?: true
     createdAt?: true
@@ -4007,6 +4012,7 @@ export namespace Prisma {
     batteryKwh?: true
     batteryType?: true
     monitoringId?: true
+    monitoringUrl?: true
     notes?: true
     isActive?: true
     createdAt?: true
@@ -4118,6 +4124,7 @@ export namespace Prisma {
     batteryKwh: Decimal | null
     batteryType: string | null
     monitoringId: string | null
+    monitoringUrl: string | null
     notes: string | null
     isActive: boolean
     createdAt: Date
@@ -4161,6 +4168,7 @@ export namespace Prisma {
     batteryKwh?: boolean
     batteryType?: boolean
     monitoringId?: boolean
+    monitoringUrl?: boolean
     notes?: boolean
     isActive?: boolean
     createdAt?: boolean
@@ -4188,6 +4196,7 @@ export namespace Prisma {
     batteryKwh?: boolean
     batteryType?: boolean
     monitoringId?: boolean
+    monitoringUrl?: boolean
     notes?: boolean
     isActive?: boolean
     createdAt?: boolean
@@ -4213,6 +4222,7 @@ export namespace Prisma {
     batteryKwh?: boolean
     batteryType?: boolean
     monitoringId?: boolean
+    monitoringUrl?: boolean
     notes?: boolean
     isActive?: boolean
     createdAt?: boolean
@@ -4238,13 +4248,14 @@ export namespace Prisma {
     batteryKwh?: boolean
     batteryType?: boolean
     monitoringId?: boolean
+    monitoringUrl?: boolean
     notes?: boolean
     isActive?: boolean
     createdAt?: boolean
     updatedAt?: boolean
   }
 
-  export type InstallationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "customerId" | "address" | "city" | "postalCode" | "latitude" | "longitude" | "systemType" | "capacityKw" | "installDate" | "inverterType" | "inverterSerial" | "panelCount" | "panelType" | "batteryKwh" | "batteryType" | "monitoringId" | "notes" | "isActive" | "createdAt" | "updatedAt", ExtArgs["result"]["installation"]>
+  export type InstallationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "customerId" | "address" | "city" | "postalCode" | "latitude" | "longitude" | "systemType" | "capacityKw" | "installDate" | "inverterType" | "inverterSerial" | "panelCount" | "panelType" | "batteryKwh" | "batteryType" | "monitoringId" | "monitoringUrl" | "notes" | "isActive" | "createdAt" | "updatedAt", ExtArgs["result"]["installation"]>
   export type InstallationInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     customer?: boolean | CustomerCacheDefaultArgs<ExtArgs>
     agreements?: boolean | Installation$agreementsArgs<ExtArgs>
@@ -4281,6 +4292,7 @@ export namespace Prisma {
       batteryKwh: Prisma.Decimal | null
       batteryType: string | null
       monitoringId: string | null
+      monitoringUrl: string | null
       notes: string | null
       isActive: boolean
       createdAt: Date
@@ -4727,6 +4739,7 @@ export namespace Prisma {
     readonly batteryKwh: FieldRef<"Installation", 'Decimal'>
     readonly batteryType: FieldRef<"Installation", 'String'>
     readonly monitoringId: FieldRef<"Installation", 'String'>
+    readonly monitoringUrl: FieldRef<"Installation", 'String'>
     readonly notes: FieldRef<"Installation", 'String'>
     readonly isActive: FieldRef<"Installation", 'Boolean'>
     readonly createdAt: FieldRef<"Installation", 'DateTime'>
@@ -20850,6 +20863,7 @@ export namespace Prisma {
     batteryKwh: 'batteryKwh',
     batteryType: 'batteryType',
     monitoringId: 'monitoringId',
+    monitoringUrl: 'monitoringUrl',
     notes: 'notes',
     isActive: 'isActive',
     createdAt: 'createdAt',
@@ -21502,6 +21516,7 @@ export namespace Prisma {
     batteryKwh?: DecimalNullableFilter<"Installation"> | Decimal | DecimalJsLike | number | string | null
     batteryType?: StringNullableFilter<"Installation"> | string | null
     monitoringId?: StringNullableFilter<"Installation"> | string | null
+    monitoringUrl?: StringNullableFilter<"Installation"> | string | null
     notes?: StringNullableFilter<"Installation"> | string | null
     isActive?: BoolFilter<"Installation"> | boolean
     createdAt?: DateTimeFilter<"Installation"> | Date | string
@@ -21528,6 +21543,7 @@ export namespace Prisma {
     batteryKwh?: SortOrderInput | SortOrder
     batteryType?: SortOrderInput | SortOrder
     monitoringId?: SortOrderInput | SortOrder
+    monitoringUrl?: SortOrderInput | SortOrder
     notes?: SortOrderInput | SortOrder
     isActive?: SortOrder
     createdAt?: SortOrder
@@ -21557,6 +21573,7 @@ export namespace Prisma {
     batteryKwh?: DecimalNullableFilter<"Installation"> | Decimal | DecimalJsLike | number | string | null
     batteryType?: StringNullableFilter<"Installation"> | string | null
     monitoringId?: StringNullableFilter<"Installation"> | string | null
+    monitoringUrl?: StringNullableFilter<"Installation"> | string | null
     notes?: StringNullableFilter<"Installation"> | string | null
     isActive?: BoolFilter<"Installation"> | boolean
     createdAt?: DateTimeFilter<"Installation"> | Date | string
@@ -21583,6 +21600,7 @@ export namespace Prisma {
     batteryKwh?: SortOrderInput | SortOrder
     batteryType?: SortOrderInput | SortOrder
     monitoringId?: SortOrderInput | SortOrder
+    monitoringUrl?: SortOrderInput | SortOrder
     notes?: SortOrderInput | SortOrder
     isActive?: SortOrder
     createdAt?: SortOrder
@@ -21615,6 +21633,7 @@ export namespace Prisma {
     batteryKwh?: DecimalNullableWithAggregatesFilter<"Installation"> | Decimal | DecimalJsLike | number | string | null
     batteryType?: StringNullableWithAggregatesFilter<"Installation"> | string | null
     monitoringId?: StringNullableWithAggregatesFilter<"Installation"> | string | null
+    monitoringUrl?: StringNullableWithAggregatesFilter<"Installation"> | string | null
     notes?: StringNullableWithAggregatesFilter<"Installation"> | string | null
     isActive?: BoolWithAggregatesFilter<"Installation"> | boolean
     createdAt?: DateTimeWithAggregatesFilter<"Installation"> | Date | string
@@ -22978,6 +22997,7 @@ export namespace Prisma {
     batteryKwh?: Decimal | DecimalJsLike | number | string | null
     batteryType?: string | null
     monitoringId?: string | null
+    monitoringUrl?: string | null
     notes?: string | null
     isActive?: boolean
     createdAt?: Date | string
@@ -23004,6 +23024,7 @@ export namespace Prisma {
     batteryKwh?: Decimal | DecimalJsLike | number | string | null
     batteryType?: string | null
     monitoringId?: string | null
+    monitoringUrl?: string | null
     notes?: string | null
     isActive?: boolean
     createdAt?: Date | string
@@ -23028,6 +23049,7 @@ export namespace Prisma {
     batteryKwh?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
     batteryType?: NullableStringFieldUpdateOperationsInput | string | null
     monitoringId?: NullableStringFieldUpdateOperationsInput | string | null
+    monitoringUrl?: NullableStringFieldUpdateOperationsInput | string | null
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     isActive?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -23054,6 +23076,7 @@ export namespace Prisma {
     batteryKwh?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
     batteryType?: NullableStringFieldUpdateOperationsInput | string | null
     monitoringId?: NullableStringFieldUpdateOperationsInput | string | null
+    monitoringUrl?: NullableStringFieldUpdateOperationsInput | string | null
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     isActive?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -23079,6 +23102,7 @@ export namespace Prisma {
     batteryKwh?: Decimal | DecimalJsLike | number | string | null
     batteryType?: string | null
     monitoringId?: string | null
+    monitoringUrl?: string | null
     notes?: string | null
     isActive?: boolean
     createdAt?: Date | string
@@ -23102,6 +23126,7 @@ export namespace Prisma {
     batteryKwh?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
     batteryType?: NullableStringFieldUpdateOperationsInput | string | null
     monitoringId?: NullableStringFieldUpdateOperationsInput | string | null
+    monitoringUrl?: NullableStringFieldUpdateOperationsInput | string | null
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     isActive?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -23126,6 +23151,7 @@ export namespace Prisma {
     batteryKwh?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
     batteryType?: NullableStringFieldUpdateOperationsInput | string | null
     monitoringId?: NullableStringFieldUpdateOperationsInput | string | null
+    monitoringUrl?: NullableStringFieldUpdateOperationsInput | string | null
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     isActive?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -24807,6 +24833,7 @@ export namespace Prisma {
     batteryKwh?: SortOrder
     batteryType?: SortOrder
     monitoringId?: SortOrder
+    monitoringUrl?: SortOrder
     notes?: SortOrder
     isActive?: SortOrder
     createdAt?: SortOrder
@@ -24839,6 +24866,7 @@ export namespace Prisma {
     batteryKwh?: SortOrder
     batteryType?: SortOrder
     monitoringId?: SortOrder
+    monitoringUrl?: SortOrder
     notes?: SortOrder
     isActive?: SortOrder
     createdAt?: SortOrder
@@ -24863,6 +24891,7 @@ export namespace Prisma {
     batteryKwh?: SortOrder
     batteryType?: SortOrder
     monitoringId?: SortOrder
+    monitoringUrl?: SortOrder
     notes?: SortOrder
     isActive?: SortOrder
     createdAt?: SortOrder
@@ -27371,6 +27400,7 @@ export namespace Prisma {
     batteryKwh?: Decimal | DecimalJsLike | number | string | null
     batteryType?: string | null
     monitoringId?: string | null
+    monitoringUrl?: string | null
     notes?: string | null
     isActive?: boolean
     createdAt?: Date | string
@@ -27395,6 +27425,7 @@ export namespace Prisma {
     batteryKwh?: Decimal | DecimalJsLike | number | string | null
     batteryType?: string | null
     monitoringId?: string | null
+    monitoringUrl?: string | null
     notes?: string | null
     isActive?: boolean
     createdAt?: Date | string
@@ -27449,6 +27480,7 @@ export namespace Prisma {
     batteryKwh?: DecimalNullableFilter<"Installation"> | Decimal | DecimalJsLike | number | string | null
     batteryType?: StringNullableFilter<"Installation"> | string | null
     monitoringId?: StringNullableFilter<"Installation"> | string | null
+    monitoringUrl?: StringNullableFilter<"Installation"> | string | null
     notes?: StringNullableFilter<"Installation"> | string | null
     isActive?: BoolFilter<"Installation"> | boolean
     createdAt?: DateTimeFilter<"Installation"> | Date | string
@@ -27645,6 +27677,7 @@ export namespace Prisma {
     batteryKwh?: Decimal | DecimalJsLike | number | string | null
     batteryType?: string | null
     monitoringId?: string | null
+    monitoringUrl?: string | null
     notes?: string | null
     isActive?: boolean
     createdAt?: Date | string
@@ -27670,6 +27703,7 @@ export namespace Prisma {
     batteryKwh?: Decimal | DecimalJsLike | number | string | null
     batteryType?: string | null
     monitoringId?: string | null
+    monitoringUrl?: string | null
     notes?: string | null
     isActive?: boolean
     createdAt?: Date | string
@@ -27822,6 +27856,7 @@ export namespace Prisma {
     batteryKwh?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
     batteryType?: NullableStringFieldUpdateOperationsInput | string | null
     monitoringId?: NullableStringFieldUpdateOperationsInput | string | null
+    monitoringUrl?: NullableStringFieldUpdateOperationsInput | string | null
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     isActive?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -27847,6 +27882,7 @@ export namespace Prisma {
     batteryKwh?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
     batteryType?: NullableStringFieldUpdateOperationsInput | string | null
     monitoringId?: NullableStringFieldUpdateOperationsInput | string | null
+    monitoringUrl?: NullableStringFieldUpdateOperationsInput | string | null
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     isActive?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -29496,6 +29532,7 @@ export namespace Prisma {
     batteryKwh?: Decimal | DecimalJsLike | number | string | null
     batteryType?: string | null
     monitoringId?: string | null
+    monitoringUrl?: string | null
     notes?: string | null
     isActive?: boolean
     createdAt?: Date | string
@@ -29519,6 +29556,7 @@ export namespace Prisma {
     batteryKwh?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
     batteryType?: NullableStringFieldUpdateOperationsInput | string | null
     monitoringId?: NullableStringFieldUpdateOperationsInput | string | null
+    monitoringUrl?: NullableStringFieldUpdateOperationsInput | string | null
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     isActive?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -29543,6 +29581,7 @@ export namespace Prisma {
     batteryKwh?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
     batteryType?: NullableStringFieldUpdateOperationsInput | string | null
     monitoringId?: NullableStringFieldUpdateOperationsInput | string | null
+    monitoringUrl?: NullableStringFieldUpdateOperationsInput | string | null
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     isActive?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -29567,6 +29606,7 @@ export namespace Prisma {
     batteryKwh?: NullableDecimalFieldUpdateOperationsInput | Decimal | DecimalJsLike | number | string | null
     batteryType?: NullableStringFieldUpdateOperationsInput | string | null
     monitoringId?: NullableStringFieldUpdateOperationsInput | string | null
+    monitoringUrl?: NullableStringFieldUpdateOperationsInput | string | null
     notes?: NullableStringFieldUpdateOperationsInput | string | null
     isActive?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string

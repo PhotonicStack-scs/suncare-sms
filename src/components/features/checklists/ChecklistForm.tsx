@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Save,
   CheckCircle,
   Loader2,
   ChevronLeft,
@@ -21,7 +20,6 @@ import { ChecklistCategory } from "./ChecklistCategory";
 
 type ItemStatus = "PENDING" | "PASSED" | "FAILED" | "NOT_APPLICABLE";
 type Severity = "CRITICAL" | "SERIOUS" | "MODERATE" | "MINOR";
-type ChecklistStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
 
 interface ChecklistItemData {
   id: string;
@@ -51,7 +49,6 @@ export function ChecklistForm({ visitId, checklistId }: ChecklistFormProps) {
   const {
     data: checklist,
     isLoading,
-    refetch,
   } = api.checklists.getById.useQuery(checklistId);
 
   const updateItem = api.checklists.updateItem.useMutation({
@@ -70,18 +67,18 @@ export function ChecklistForm({ visitId, checklistId }: ChecklistFormProps) {
   useEffect(() => {
     if (checklist?.items) {
       setItems(
-        checklist.items.map((item) => ({
+        checklist.items.map((item, index) => ({
           id: item.id,
-          category: item.templateItem?.category ?? "GENERAL",
-          description: item.templateItem?.description ?? "",
-          inputType: item.templateItem?.inputType ?? "YES_NO",
+          category: item.category ?? "GENERAL",
+          description: item.description ?? "",
+          inputType: item.inputType ?? "YES_NO",
           status: (item.status as ItemStatus) ?? "PENDING",
           value: item.value,
           numericValue: item.numericValue ? Number(item.numericValue) : null,
           notes: item.notes,
           photoUrl: item.photoUrl,
           severity: item.severity as Severity | null,
-          order: item.templateItem?.order ?? 0,
+          order: index,
         }))
       );
     }
@@ -91,10 +88,9 @@ export function ChecklistForm({ visitId, checklistId }: ChecklistFormProps) {
   const itemsByCategory = useMemo(() => {
     const grouped = items.reduce(
       (acc, item) => {
-        if (!acc[item.category]) {
-          acc[item.category] = [];
-        }
-        acc[item.category].push(item);
+        const category = item.category;
+        const categoryItems = (acc[category] ??= []);
+        categoryItems.push(item);
         return acc;
       },
       {} as Record<string, ChecklistItemData[]>
@@ -137,7 +133,6 @@ export function ChecklistForm({ visitId, checklistId }: ChecklistFormProps) {
       setIsSaving(true);
       updateItem.mutate(
         {
-          checklistId,
           itemId,
           ...updates,
         },
@@ -146,20 +141,27 @@ export function ChecklistForm({ visitId, checklistId }: ChecklistFormProps) {
         }
       );
     },
-    [checklistId, updateItem]
+    [updateItem]
   );
 
   const handleComplete = async () => {
     // Check if all items are completed
     const pendingItems = items.filter((item) => item.status === "PENDING");
     if (pendingItems.length > 0) {
-      // Could show a warning dialog here
       alert(`Det gjenstår ${pendingItems.length} punkter. Fullfør alle punkter før du avslutter.`);
       return;
     }
 
     await completeChecklist.mutateAsync({
       id: checklistId,
+      items: items.map((item) => ({
+        itemId: item.id,
+        status: item.status,
+        value: item.value ?? undefined,
+        numericValue: item.numericValue ?? undefined,
+        notes: item.notes ?? undefined,
+        severity: item.severity ?? undefined,
+      })),
     });
   };
 
@@ -295,10 +297,10 @@ export function ChecklistForm({ visitId, checklistId }: ChecklistFormProps) {
                 >
                   {item.severity && (
                     <StatusBadge
-                      status={
+                      variant={
                         item.severity === "CRITICAL" || item.severity === "SERIOUS"
                           ? "blocked"
-                          : "pending"
+                          : "scheduled"
                       }
                     >
                       {item.severity}

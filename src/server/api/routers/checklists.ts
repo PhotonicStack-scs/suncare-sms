@@ -1,7 +1,6 @@
 import { z } from "zod";
 import {
   createTRPCRouter,
-  protectedProcedure,
   checklistsReadProcedure,
   checklistsWriteProcedure,
 } from "~/server/api/trpc";
@@ -288,10 +287,8 @@ export const checklistsRouter = createTRPCRouter({
       // Group items by category
       const grouped = checklist.items.reduce(
         (acc, item) => {
-          if (!acc[item.category]) {
-            acc[item.category] = [];
-          }
-          acc[item.category].push(item);
+          const categoryItems = (acc[item.category] ??= []);
+          categoryItems.push(item);
           return acc;
         },
         {} as Record<string, typeof checklist.items>

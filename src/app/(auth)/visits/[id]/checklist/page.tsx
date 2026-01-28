@@ -2,7 +2,7 @@
 
 import { use, useState, useEffect } from "react";
 import Link from "next/link";
-import { Loader2, FileText, Plus, AlertCircle } from "lucide-react";
+import { Loader2, FileText, AlertCircle } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { ChecklistForm } from "~/components/features/checklists";
@@ -28,7 +28,7 @@ export default function ChecklistPage({ params }: ChecklistPageProps) {
   });
 
   // Create checklist mutation
-  const createChecklist = api.checklists.create.useMutation({
+  const createChecklist = api.checklists.createFromTemplate.useMutation({
     onSuccess: (newChecklist) => {
       setSelectedChecklistId(newChecklist.id);
     },
@@ -135,6 +135,7 @@ export default function ChecklistPage({ params }: ChecklistPageProps) {
                     createChecklist.mutate({
                       visitId,
                       templateId: template.id,
+                      technicianId: visit.technicianId,
                     })
                   }
                   disabled={createChecklist.isPending}
